@@ -1,0 +1,149 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+# Vector database
+chroma_db/
+*.db
+*.sqlite
+
+# Ollama models and data
+ollama_data/
+*.bin
+*.gguf
+*.safetensors
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Document uploads (for testing)
+uploads/
+sample_uploads/
+
+# API keys and secrets
+.env.local
+.env.production
+.env.development
+secrets.yaml
+config/secrets.py
+
+# Docker
+.dockerignore
+
+# Model downloads
+models/
+*.model
+
+# Jupyter notebooks
+.ipynb_checkpoints
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Large files that shouldn't be in Git
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Test outputs
+test_outputs/
+test_results/
+
+# Cache
+.cache/
+__pycache__/ 
