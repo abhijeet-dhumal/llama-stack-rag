@@ -5,7 +5,8 @@ Provides REST API endpoints for document ingestion and querying
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 import tempfile
@@ -73,6 +74,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # Pydantic models
 class QueryRequest(BaseModel):
     question: str = Field(..., description="The question to ask")
@@ -106,9 +112,25 @@ class BatchIngestionResponse(BaseModel):
     failed: int
 
 
-@app.get("/", response_model=Dict[str, str])
+@app.get("/")
 async def root():
-    """Root endpoint"""
+    """Serve the main UI"""
+    static_dir = Path(__file__).parent.parent / "static"
+    index_file = static_dir / "index.html"
+    
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    else:
+        return {
+            "message": "Local RAG Pipeline API",
+            "version": "1.0.0",
+            "status": "running",
+            "note": "UI not found - static files may not be available"
+        }
+
+@app.get("/api", response_model=Dict[str, str])
+async def api_info():
+    """API information endpoint"""
     return {
         "message": "Local RAG Pipeline API",
         "version": "1.0.0",

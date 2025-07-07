@@ -9,96 +9,75 @@
 
 A **privacy-focused** Retrieval-Augmented Generation (RAG) pipeline that runs entirely on your local machine. Built with FastAPI, Ollama, and ChromaDB for secure document processing and intelligent question answering.
 
-## 🏗️ Architecture Overview
+## 🏗️ End-to-End User Flow
 
-```mermaid
-graph TB
-    subgraph "User Interface"
-        U[User] 
-        API[FastAPI Server<br/>Port 8000]
-    end
-    
-    subgraph "Document Ingestion Flow"
-        DOC[Document Upload<br/>PDF/MD/TXT/DOCX]
-        PROC[DocumentProcessor<br/>Extract Text Content]
-        CHUNK[SemanticChunker<br/>Split into Chunks]
-        EMBED1[OllamaEmbedder<br/>Generate Embeddings]
-        STORE[VectorStore<br/>Save to ChromaDB]
-    end
-    
-    subgraph "Query Processing Flow"
-        QUERY[User Query<br/>Natural Language]
-        EMBED2[OllamaEmbedder<br/>Query Embedding]
-        SEARCH[Vector Search<br/>Find Similar Chunks]
-        CONTEXT[Context Builder<br/>Combine Relevant Chunks]
-        LLM[OllamaLLM<br/>Generate Response]
-        RESPONSE[Formatted Response<br/>Answer + Sources]
-    end
-    
-    subgraph "External Services"
-        OLLAMA[Ollama Server<br/>Port 11434]
-        CHROMA[(ChromaDB<br/>Vector Database)]
-        MODELS[AI Models<br/>• nomic-embed-text<br/>• llama3.2:3b<br/>• all-MiniLM-L6-v2]
-    end
-    
-    subgraph "Storage"
-        FILES[chroma_db/<br/>Persistent Storage]
-        LOGS[logs/<br/>Application Logs]
-    end
-    
-    %% Document Ingestion Flow
-    U -->|Upload Document| API
-    API --> DOC
-    DOC --> PROC
-    PROC --> CHUNK
-    CHUNK --> EMBED1
-    EMBED1 --> STORE
-    
-    %% Query Processing Flow
-    U -->|Ask Question| QUERY
-    QUERY --> API
-    API --> EMBED2
-    EMBED2 --> SEARCH
-    SEARCH --> CONTEXT
-    CONTEXT --> LLM
-    LLM --> RESPONSE
-    RESPONSE --> API
-    API --> U
-    
-    %% External Connections
-    EMBED1 -.->|API Call| OLLAMA
-    EMBED2 -.->|API Call| OLLAMA
-    LLM -.->|API Call| OLLAMA
-    OLLAMA -.->|Load Models| MODELS
-    
-    STORE -.->|Store Vectors| CHROMA
-    SEARCH -.->|Query Vectors| CHROMA
-    CHROMA -.->|Persist| FILES
-    
-    API -.->|Write Logs| LOGS
-    
-    %% Styling
-    classDef user fill:#e1f5fe
-    classDef api fill:#f3e5f5
-    classDef process fill:#e8f5e8
-    classDef storage fill:#fff3e0
-    classDef external fill:#fce4ec
-    
-    class U,API user
-    class DOC,PROC,CHUNK,EMBED1,EMBED2,STORE,SEARCH,CONTEXT,LLM process
-    class CHROMA,FILES,LOGS storage
-    class OLLAMA,MODELS external
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        🌐 Web Interface (localhost:8000)                        │
+├─────────────────────┬─────────────────────┬─────────────────────────────────────┤
+│   📤 Upload Tab     │   🔍 Query Tab      │        📊 Dashboard Tab             │
+│  Drag & Drop Files  │  Ask Questions      │      Monitor System                 │
+└──────────┬──────────┴──────────┬──────────┴──────────┬──────────────────────────┘
+           │                     │                     │
+           │                     │                     │
+           ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    📄 Document Processing Pipeline                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Upload File ──▶ Validate ──▶ Extract Text ──▶ Create Chunks ──▶ Store Vector   │
+│  (PDF/MD/TXT/   (Format     (Parse Content)   (Semantic Split)  (ChromaDB +     │
+│   DOCX)          Check)                        (~1000 chars)     Metadata)      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ❓ Question Answering Flow                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  User Question ──▶ Embed Query ──▶ Search Database ──▶ Build Context ──▶ Answer │
+│  (Natural         (Vector        (Find Similar     (Combine Best    (LLM with   │
+│   Language)        Embedding)     Chunks)          Chunks)          Citations)  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            🖥️ Core Services                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐              │
+│  │   FastAPI       │    │     Ollama      │    │    ChromaDB     │              │
+│  │   Server        │    │     Server      │    │    Vector       │              │
+│  │ 🚀 Port 8000    │    │ 🤖 Port 11434   │    │    Database     │              │
+│  │ 📚 REST API     │    │ 🔥 Local LLM    │    │ 💾 Persistent   │              │
+│  │                 │    │                 │    │    Storage      │              │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘              │
+│                                                                                 │
+│  • Serves Web UI        • Embeddings       • Vector Storage                     │
+│  • Handles API calls    • Text Generation  • Similarity Search                  │
+│  • Manages uploads      • Model: llama3.2  • Metadata Storage                   │
+│                         • Model: nomic-embed                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                                    📡 Data Flow
+                          ┌─────────────────────────────┐
+                          │ User  ◀──────────────▶ API │
+                          │ API   ◀──────────────▶ LLM │
+                          │ API   ◀──────────────▶ DB  │
+                          └─────────────────────────────┘
 ```
 
 ## ✨ Features
 
 - 🔒 **100% Local Processing** - No data leaves your machine
+- 🌐 **Modern Web UI** - Responsive interface with drag & drop uploads
 - 📄 **Multi-format Support** - PDF, Markdown, Text, and Word documents
 - 🧠 **Semantic Chunking** - Intelligent document segmentation
 - 🔍 **Vector Search** - Fast similarity-based retrieval
 - 🤖 **Local LLM** - Powered by Ollama (llama3.2:3b)
 - 🚀 **Fast API** - RESTful interface with auto-generated docs
 - 📊 **Persistent Storage** - ChromaDB vector database
+- 📱 **Mobile-Friendly** - Works on desktop, tablet, and mobile
 - 🐳 **Container Support** - Docker/Podman ready
 
 ## 🚀 Quick Start
@@ -162,6 +141,75 @@ graph TB
    curl http://localhost:8000/health
    # Should return: {"status":"healthy","pipeline_status":"healthy","message":"RAG pipeline is running"}
    ```
+
+5. **Access the Web UI**:
+   Open your browser and navigate to `http://localhost:8000` to access the modern web interface with:
+   - **Drag & Drop File Upload** - Upload documents with visual feedback
+   - **Interactive Query Interface** - Ask questions with real-time responses
+   - **Live Dashboard** - Monitor system status and document statistics
+   - **Mobile-Responsive Design** - Works on desktop, tablet, and mobile devices
+
+## 📸 Web Interface Screenshots
+
+<div align="center">
+
+### 📤 Upload Documents Tab
+![Upload Interface](./sample_docs/ui_screenshots/upload_interface.png)
+*Drag & drop interface for uploading PDF, Markdown, Text, and Word documents with real-time validation*
+
+### 🔍 Query Documents Tab  
+![Query Interface](./sample_docs/ui_screenshots/query_interface.png)
+*Natural language query interface with context controls and rich answer display showing sources and relevance scores*
+
+### 📊 Dashboard Tab
+![Dashboard Interface](./sample_docs/ui_screenshots/dashboard_interface.png)
+*System monitoring dashboard with document statistics, model information, and management controls*
+
+</div>
+
+## 🌐 Web Interface
+
+The RAG Pipeline now includes a modern, responsive web interface accessible at `http://localhost:8000`. The UI provides three main sections:
+
+### 📤 Upload Documents
+- **Drag & Drop Interface**: Simply drag files into the upload area
+- **Multi-file Support**: Upload multiple documents simultaneously  
+- **Real-time Progress**: Visual feedback during upload and processing
+- **Format Validation**: Automatic validation of supported file types (PDF, MD, TXT, DOCX)
+- **Upload Queue**: Track processing status of multiple files
+
+### 🔍 Query Interface
+- **Natural Language Queries**: Ask questions in plain English
+- **Context Control**: Adjust the number of context chunks (3-20)
+- **Rich Results**: View answers with source attribution and relevance scores
+- **Real-time Processing**: Live status updates during query processing
+- **Keyboard Shortcuts**: Use Ctrl+Enter to submit queries quickly
+
+### 📊 Dashboard
+- **System Statistics**: Real-time pipeline status and document counts
+- **Model Information**: View currently loaded LLM and embedding models
+- **Document Management**: Browse uploaded documents and metadata
+- **Health Monitoring**: Live system health checks and status indicators
+- **Bulk Operations**: Clear all documents with confirmation prompts
+
+### 📱 Mobile Support
+The interface is fully responsive and works seamlessly on:
+- Desktop computers (Windows, macOS, Linux)
+- Tablets (iPad, Android tablets)
+- Mobile phones (iOS, Android)
+
+### ⌨️ Keyboard Shortcuts
+- **Ctrl+U**: Switch to Upload tab
+- **Ctrl+Q**: Switch to Query tab  
+- **Ctrl+D**: Switch to Dashboard tab
+- **Ctrl+Enter**: Submit query (when in text area)
+
+### ♿ Accessibility Features
+- **Semantic HTML**: Screen reader compatible
+- **Keyboard Navigation**: Full keyboard support
+- **High Contrast**: Good color contrast ratios
+- **Toast Notifications**: Non-intrusive status messages
+- **Loading States**: Clear feedback during operations
 
 ## 📚 Usage Examples
 
@@ -256,7 +304,8 @@ curl http://localhost:8000/stats
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/` | Root endpoint |
+| `GET` | `/` | Web UI interface |
+| `GET` | `/api` | API information |
 | `GET` | `/health` | Health check |
 | `GET` | `/docs` | Interactive API documentation |
 | `POST` | `/ingest` | Upload and process a document |

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local RAG Pipeline</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-brain"></i> Local RAG Pipeline</h1>
+            <div class="status-indicator">
+                <span id="status-dot" class="status-dot"></span>
+                <span id="status-text">Checking...</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="upload">
+                    <i class="fas fa-upload"></i> Upload Documents
+                </button>
+                <button class="nav-tab" data-tab="query">
+                    <i class="fas fa-question-circle"></i> Ask Questions
+                </button>
+                <button class="nav-tab" data-tab="dashboard">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+        <div class="container">
+            <!-- Upload Section -->
+            <section id="upload-section" class="section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-upload"></i> Upload Documents</h2>
+                    <p>Upload PDF, Markdown, Text, or Word documents to your knowledge base</p>
+                </div>
+
+                <div class="upload-area">
+                    <div class="upload-box" id="upload-box">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Drop files here or click to browse</h3>
+                            <p>Supported formats: PDF, MD, TXT, DOCX</p>
+                            <p class="file-size-limit">Max file size: 100MB</p>
+                        </div>
+                        <input type="file" id="file-input" multiple accept=".pdf,.md,.txt,.docx" hidden>
+                    </div>
+                </div>
+
+                <div class="upload-queue" id="upload-queue" style="display: none;">
+                    <h3>Upload Queue</h3>
+                    <div class="queue-list" id="queue-list"></div>
+                </div>
+            </section>
+
+            <!-- Query Section -->
+            <section id="query-section" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-question-circle"></i> Ask Questions</h2>
+                    <p>Ask questions about your uploaded documents</p>
+                </div>
+
+                <div class="query-container">
+                    <div class="query-input-group">
+                        <textarea id="query-input" placeholder="Ask a question about your documents..." rows="3"></textarea>
+                        <div class="query-controls">
+                            <div class="context-control">
+                                <label for="context-limit">Context Chunks:</label>
+                                <select id="context-limit">
+                                    <option value="3">3</option>
+                                    <option value="5" selected>5</option>
+                                    <option value="10">10</option>
+                                    <option value="15">15</option>
+                                    <option value="20">20</option>
+                                </select>
+                            </div>
+                            <button id="query-btn" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Ask Question
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="query-results" id="query-results"></div>
+                </div>
+            </section>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-line"></i> Dashboard</h2>
+                    <p>System statistics and document management</p>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-file-alt"></i> Documents</h3>
+                        <div class="stat-value" id="doc-count">-</div>
+                        <div class="stat-label">Total Documents</div>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-robot"></i> Models</h3>
+                        <div class="model-info">
+                            <div class="model-row">
+                                <span class="model-label">LLM:</span>
+                                <span class="model-value" id="llm-model">-</span>
+                            </div>
+                            <div class="model-row">
+                                <span class="model-label">Embedding:</span>
+                                <span class="model-value" id="embedding-model">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-server"></i> System Status</h3>
+                        <div class="status-info">
+                            <div class="status-row">
+                                <span class="status-label">Pipeline:</span>
+                                <span class="status-value" id="pipeline-status">-</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Database:</span>
+                                <span class="status-value" id="db-status">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card actions-card">
+                        <h3><i class="fas fa-cog"></i> Actions</h3>
+                        <div class="action-buttons">
+                            <button id="refresh-stats" class="btn btn-secondary">
+                                <i class="fas fa-sync"></i> Refresh Stats
+                            </button>
+                            <button id="clear-docs" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Clear All Documents
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="documents-list" id="documents-list">
+                    <h3>Document List</h3>
+                    <div class="documents-container" id="documents-container">
+                        <div class="loading">Loading documents...</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html> 
