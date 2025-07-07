@@ -728,4 +728,135 @@ body {
     .action-buttons .btn {
         width: 100%;
     }
+}
+
+/* Footer styles */
+.footer {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin-top: 3rem;
+    padding: 2rem 0 1rem 0;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    gap: 2rem;
+}
+
+.footer-info p {
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.footer-tech {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.text-red {
+    color: #ff6b6b;
+}
+
+.footer-links {
+    text-align: right;
+}
+
+.footer-creator {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+}
+
+.social-links {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.social-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.social-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.social-link.project:hover {
+    background: #667eea;
+}
+
+.social-link.linkedin:hover {
+    background: #0077b5;
+}
+
+.social-link.github:hover {
+    background: #333;
+}
+
+.social-link i {
+    font-size: 1.2rem;
+}
+
+.footer-bottom {
+    text-align: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    opacity: 0.8;
+    font-size: 0.9rem;
+}
+
+/* Footer responsive */
+@media (max-width: 768px) {
+    .footer-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .footer-links {
+        text-align: center;
+    }
+    
+    .social-links {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .social-link {
+        flex: 1;
+        min-width: 120px;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .footer {
+        padding: 1.5rem 0 1rem 0;
+    }
+    
+    .social-links {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .social-link {
+        min-width: auto;
+    }
 } 

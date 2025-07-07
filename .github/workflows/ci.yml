@@ -74,7 +74,7 @@ jobs:
     
     - name: Build Docker image
       run: |
-        docker build -t rag-pipeline:latest .
+        docker build -f deploy/Dockerfile -t rag-pipeline:latest .
     
     - name: Test Docker image
       run: |

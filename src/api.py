@@ -189,8 +189,8 @@ async def ingest_document(file: UploadFile = File(...)):
             
             logger.info(f"Processing uploaded file: {file.filename}")
             
-            # Process the document
-            result = rag_pipeline.ingest_document(tmp_file_path)
+            # Process the document with original filename
+            result = rag_pipeline.ingest_document(tmp_file_path, original_filename=file.filename)
             
             logger.info(f"Successfully ingested: {file.filename}")
             return IngestionResponse(**result)
@@ -313,9 +313,18 @@ async def get_pipeline_stats():
 @app.get("/documents", response_model=Dict[str, Any])
 async def list_documents():
     """List ingested documents"""
+    if rag_pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail="RAG pipeline is still initializing. Please wait for model download to complete."
+        )
+    
     try:
+        documents = rag_pipeline.get_documents()
         stats = rag_pipeline.get_stats()
+        
         return {
+            "documents": documents,
             "total_documents": stats['vector_store_stats']['document_count'],
             "collection_name": stats['vector_store_stats']['collection_name'],
             "status": "active"
@@ -331,13 +340,21 @@ async def list_documents():
 @app.delete("/documents")
 async def clear_documents():
     """Clear all documents from the vector store"""
+    if rag_pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail="RAG pipeline is still initializing. Please wait for model download to complete."
+        )
+    
     try:
-        # This would require implementing a clear method in the vector store
-        # For now, return a message
-        return {
-            "message": "Document clearing not implemented yet",
-            "status": "pending"
-        }
+        result = rag_pipeline.clear_documents()
+        if result["status"] == "success":
+            return result
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=result["message"]
+            )
     except Exception as e:
         logger.error(f"Error clearing documents: {str(e)}")
         raise HTTPException(

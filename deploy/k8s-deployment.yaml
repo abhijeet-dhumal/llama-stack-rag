@@ -1,0 +1,333 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llama-stack-rag
+  labels:
+    name: llama-stack-rag
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models-pvc
+  namespace: llama-stack-rag
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-db-pvc
+  namespace: llama-stack-rag
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rag-logs-pvc
+  namespace: llama-stack-rag
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# ConfigMap for environment variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-config
+  namespace: llama-stack-rag
+data:
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  VECTOR_DB_PATH: "/app/chroma_db"
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "production"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  CORS_ORIGINS: "*"
+  MAX_UPLOAD_SIZE: "10485760"
+
+---
+# Ollama Deployment (simplified)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-deployment
+  namespace: llama-stack-rag
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        env:
+        - name: OLLAMA_ORIGINS
+          value: "*"
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        - name: OLLAMA_PORT
+          value: "11434"
+        - name: OLLAMA_HOME
+          value: "/tmp/ollama"
+        - name: HOME
+          value: "/tmp"
+        - name: OLLAMA_MODELS
+          value: "/tmp/ollama/models"
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /tmp/ollama
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 15
+      volumes:
+      - name: ollama-models
+        persistentVolumeClaim:
+          claimName: ollama-models-pvc
+
+---
+# Ollama Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: llama-stack-rag
+  labels:
+    app: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+  - name: ollama-api
+    port: 11434
+    targetPort: 11434
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Model Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-init-job
+  namespace: llama-stack-rag
+  labels:
+    app: model-init
+spec:
+  template:
+    metadata:
+      labels:
+        app: model-init
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-ollama
+        image: curlimages/curl:latest
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for Ollama to be ready..."
+          until curl -f http://ollama-service:11434/api/tags; do
+            echo "Ollama not ready yet, waiting 10 seconds..."
+            sleep 10
+          done
+          echo "Ollama is ready!"
+      containers:
+      - name: model-init
+        image: curlimages/curl:latest
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "🚀 Initializing Ollama models..."
+          
+          echo "📥 Pulling nomic-embed-text..."
+          curl -X POST http://ollama-service:11434/api/pull \
+            -H "Content-Type: application/json" \
+            -d '{"name":"nomic-embed-text"}' \
+            --max-time 1800
+          
+          echo "📥 Pulling llama3.2:1b..."
+          curl -X POST http://ollama-service:11434/api/pull \
+            -H "Content-Type: application/json" \
+            -d '{"name":"llama3.2:1b"}' \
+            --max-time 1800
+          
+          echo "🎉 Model initialization complete!"
+
+---
+# RAG Pipeline Deployment (simplified - let OpenShift assign UID)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-pipeline-deployment
+  namespace: llama-stack-rag
+  labels:
+    app: rag-pipeline
+  annotations:
+    image.version: "0.1.0"
+    last-updated: "2025-01-07"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-pipeline
+  template:
+    metadata:
+      labels:
+        app: rag-pipeline
+      annotations:
+        image.version: "0.1.0"
+    spec:
+      containers:
+      - name: rag-pipeline
+        # Use the fixed image that includes uvicorn
+        image: quay.io/abdhumal/llama-stack-rag:0.1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: rag-config
+        volumeMounts:
+        - name: chroma-db
+          mountPath: /app/chroma_db
+        - name: rag-logs
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 15
+      volumes:
+      - name: chroma-db
+        persistentVolumeClaim:
+          claimName: chroma-db-pvc
+      - name: rag-logs
+        persistentVolumeClaim:
+          claimName: rag-logs-pvc
+
+---
+# RAG Pipeline Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-pipeline-service
+  namespace: llama-stack-rag
+  labels:
+    app: rag-pipeline
+spec:
+  selector:
+    app: rag-pipeline
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Ingress for external access (Kubernetes compatibility)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rag-pipeline-ingress
+  namespace: llama-stack-rag
+  labels:
+    app: rag-pipeline
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: rag-pipeline.local  # Change this to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rag-pipeline-service
+            port:
+              number: 8000
+
+ 

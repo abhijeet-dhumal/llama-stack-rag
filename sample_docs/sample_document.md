@@ -53,7 +53,7 @@ This is a sample document created to test the RAG pipeline functionality. It con
 ### Model Settings
 ```yaml
 embedding_model: "nomic-embed-text"
-llm_model: "llama3.2:3b"
+llm_model: "llama3.2:1b"
 chunk_size: 1000
 chunk_overlap: 200
 semantic_chunking: true

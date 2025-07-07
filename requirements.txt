@@ -16,13 +16,10 @@ numpy==1.26.4
 # Vector database
 chromadb==0.4.17
 
-# ML and NLP dependencies  
-sentence-transformers==2.7.0
-scikit-learn==1.3.2
-
 # Utilities
 redis==5.0.1
+requests
 
-# Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1 
+# Optional heavy ML dependencies (install manually for local development if needed):
+# sentence-transformers==2.7.0  # 2GB! Enables semantic chunking, falls back to simple chunking
+# scikit-learn==1.3.2          # 500MB! Enables sklearn cosine similarity, falls back to numpy 

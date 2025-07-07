@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     
     # Model settings
     embedding_model: str = "nomic-embed-text"
-    llm_model: str = "llama3.2:3b"
+    llm_model: str = "llama3.2:1b"
     
     # Vector store settings
     vector_db_path: str = "./chroma_db"

@@ -1,0 +1,257 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llama-stack-rag-scalable
+  labels:
+    name: llama-stack-rag-scalable
+
+---
+# Redis Cluster for Caching
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  namespace: llama-stack-rag-scalable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        command: ["redis-server", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: llama-stack-rag-scalable
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
+
+---
+# Ollama Service Pool (3 replicas for load distribution)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-deployment
+  namespace: llama-stack-rag-scalable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        env:
+        - name: OLLAMA_ORIGINS
+          value: "*"
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        - name: OLLAMA_CONCURRENT_REQUESTS
+          value: "4"
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /tmp/ollama
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+      volumes:
+      - name: ollama-models
+        persistentVolumeClaim:
+          claimName: ollama-models-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: llama-stack-rag-scalable
+spec:
+  selector:
+    app: ollama
+  ports:
+  - port: 11434
+    targetPort: 11434
+  type: ClusterIP
+
+---
+# Scalable RAG Pipeline with HPA
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-pipeline-deployment
+  namespace: llama-stack-rag-scalable
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: rag-pipeline
+  template:
+    metadata:
+      labels:
+        app: rag-pipeline
+    spec:
+      containers:
+      - name: rag-pipeline
+        image: quay.io/abdhumal/llama-stack-rag:0.1.4
+        ports:
+        - containerPort: 8000
+        env:
+        - name: OLLAMA_BASE_URL
+          value: "http://ollama-service:11434"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: UVICORN_WORKERS
+          value: "4"
+        - name: CACHE_TTL
+          value: "3600"
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+        volumeMounts:
+        - name: chroma-db
+          mountPath: /app/chroma_db
+      volumes:
+      - name: chroma-db
+        persistentVolumeClaim:
+          claimName: chroma-db-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-pipeline-service
+  namespace: llama-stack-rag-scalable
+spec:
+  selector:
+    app: rag-pipeline
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rag-pipeline-hpa
+  namespace: llama-stack-rag-scalable
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rag-pipeline-deployment
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+# Load Balancer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-pipeline-lb
+  namespace: llama-stack-rag-scalable
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  selector:
+    app: rag-pipeline
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+
+---
+# PVC for shared storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models-pvc
+  namespace: llama-stack-rag-scalable
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-db-pvc
+  namespace: llama-stack-rag-scalable
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi 

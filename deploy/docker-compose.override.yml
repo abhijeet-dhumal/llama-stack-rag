@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+services:
+  rag-pipeline:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    volumes:
+      - ../src:/app/src:ro
+      - ../config:/app/config:ro
+      - ../static:/app/static:ro
+      - ../chroma_db:/app/chroma_db
+      - ../sample_docs:/app/sample_docs:ro
+      - ../logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - RELOAD=true
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    
+  # Enable Redis for development
+  redis:
+    profiles: []
+
+  # Add development database viewer
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    ports:
+      - "8080:8080"
+    profiles:
+      - dev-tools 

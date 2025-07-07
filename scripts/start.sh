@@ -135,6 +135,12 @@ start_api() {
 start_podman_manual() {
     echo -e "${YELLOW}Starting containers manually with Podman...${NC}"
     
+    # Stop and remove any existing containers
+    echo -e "${YELLOW}Cleaning up any existing containers...${NC}"
+    podman stop ollama rag-pipeline 2>/dev/null || true
+    podman rm ollama rag-pipeline 2>/dev/null || true
+    podman pod rm rag-pod 2>/dev/null || true
+    
     # Create required directories for volume mounts
     echo -e "${YELLOW}Creating required directories...${NC}"
     mkdir -p chroma_db
@@ -163,7 +169,7 @@ This is a sample document for testing the RAG pipeline." > sample_docs/sample_do
     
     # Build RAG pipeline image
     echo -e "${YELLOW}Building RAG pipeline image...${NC}"
-    podman build -t rag-pipeline .
+    podman build -t rag-pipeline -f deploy/Dockerfile .
     
     # Start RAG pipeline container
     echo -e "${YELLOW}Starting RAG pipeline container...${NC}"
@@ -192,8 +198,8 @@ start_docker() {
     fi
     
     # Check if compose file exists
-    if [ ! -f "docker-compose.yml" ]; then
-        echo -e "${RED}Error: docker-compose.yml not found${NC}"
+    if [ ! -f "deploy/docker-compose.yml" ]; then
+        echo -e "${RED}Error: deploy/docker-compose.yml not found${NC}"
         exit 1
     fi
     
@@ -254,9 +260,23 @@ This sample document helps verify that the RAG pipeline is working correctly." >
         return
     fi
     
+    # Stop any existing containers first
+    echo -e "${YELLOW}Stopping any existing containers...${NC}"
+    (cd deploy && $COMPOSE_CMD down 2>/dev/null || true)
+    
+    # Also clean up any leftover containers from manual runs
+    if [ "$CONTAINER_CMD" = "podman" ]; then
+        podman stop ollama rag-pipeline 2>/dev/null || true
+        podman rm ollama rag-pipeline 2>/dev/null || true
+        podman pod rm rag-pod 2>/dev/null || true
+    elif [ "$CONTAINER_CMD" = "docker" ]; then
+        docker stop ollama rag-pipeline 2>/dev/null || true
+        docker rm ollama rag-pipeline 2>/dev/null || true
+    fi
+    
     # Start services with compose
     echo -e "${YELLOW}Using $COMPOSE_CMD to start services...${NC}"
-    $COMPOSE_CMD up -d
+    (cd deploy && $COMPOSE_CMD up -d)
     
     # Wait for services to be ready
     echo -e "${YELLOW}Waiting for services to start...${NC}"
@@ -292,9 +312,9 @@ stop_services() {
     # Stop container services
     check_dependencies
     
-    if [ -f "docker-compose.yml" ] && [ -n "$COMPOSE_CMD" ]; then
+    if [ -f "deploy/docker-compose.yml" ] && [ -n "$COMPOSE_CMD" ]; then
         echo -e "${YELLOW}Stopping services with $COMPOSE_CMD...${NC}"
-        $COMPOSE_CMD down
+        (cd deploy && $COMPOSE_CMD down)
     elif [ "$CONTAINER_CMD" = "podman" ]; then
         echo -e "${YELLOW}Stopping Podman containers...${NC}"
         podman stop ollama rag-pipeline 2>/dev/null || true
@@ -349,7 +369,7 @@ show_status() {
     fi
     
     # Check container orchestration
-    if [ -n "$COMPOSE_CMD" ] && $COMPOSE_CMD ps 2>/dev/null | grep -q "Up"; then
+    if [ -n "$COMPOSE_CMD" ] && (cd deploy && $COMPOSE_CMD ps 2>/dev/null | grep -q "Up"); then
         echo -e "${GREEN}✓ Container orchestration ($COMPOSE_CMD): Running${NC}"
     elif [ "$CONTAINER_CMD" = "podman" ] && podman pod ps | grep -q "rag-pod"; then
         echo -e "${GREEN}✓ Container orchestration (podman): Running${NC}"
