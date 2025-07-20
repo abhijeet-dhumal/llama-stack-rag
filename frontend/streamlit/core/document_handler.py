@@ -789,7 +789,7 @@ def get_document_count() -> int:
 
 def try_basic_extraction(uploaded_file, file_extension: str) -> str:
     """Simplified extraction - recommend docling for all complex formats"""
-    return f"""Content from {uploaded_file.name} ({file_extension.upper()} format)
+        return f"""Content from {uploaded_file.name} ({file_extension.upper()} format)
 
 📋 To extract content from this file, install docling:
    pip install docling[all]
@@ -890,20 +890,20 @@ def create_text_chunks(text: str, chunk_size: int = None, overlap: int = None) -
             if para_break > start + chunk_size // 3:  # Must be at least 1/3 into chunk
                 end = para_break + 2
             else:
-                # Look for sentence boundary (. ! ?)
-                sentence_break = max(
-                    text.rfind('. ', start, end),
-                    text.rfind('! ', start, end),
-                    text.rfind('? ', start, end)
-                )
-                
+            # Look for sentence boundary (. ! ?)
+            sentence_break = max(
+                text.rfind('. ', start, end),
+                text.rfind('! ', start, end),
+                text.rfind('? ', start, end)
+            )
+            
                 if sentence_break > start + chunk_size // 2:  # Must be at least halfway
-                    end = sentence_break + 1
-                else:
+                end = sentence_break + 1
+            else:
                     # Look for word boundary as last resort
-                    word_break = text.rfind(' ', start, end)
-                    if word_break > start + chunk_size // 2:
-                        end = word_break
+                word_break = text.rfind(' ', start, end)
+                if word_break > start + chunk_size // 2:
+                    end = word_break
         
         # Extract chunk
         chunk = text[start:end].strip()

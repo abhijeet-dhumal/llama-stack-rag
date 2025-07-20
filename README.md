@@ -56,6 +56,22 @@ make setup && make start
 
 ---
 
+## 📸 **Screenshots**
+
+### **Main Application Interface**
+![Main Interface](data/images/Screenshot%202025-07-20%20at%2011.11.29%20PM.png)
+*Clean, modern interface with sidebar controls and main chat area*
+
+### **Document Processing & Chat**
+![Document Processing](data/images/Screenshot%202025-07-20%20at%2011.12.41%20PM.png) 
+*Real-time document processing with performance metrics and intelligent chat responses*
+
+### **System Status & Diagnostics**
+![System Status](data/images/Screenshot%202025-07-20%20at%2011.13.52%20PM.png)
+*Comprehensive system monitoring with LlamaStack and Ollama status indicators*
+
+---
+
 ## 🏛️ **System Architecture**
 
 ### **Current Streamlit-Only Architecture**
