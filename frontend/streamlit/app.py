@@ -83,9 +83,30 @@ def render_header():
     # Render the fixed-position theme toggle
     render_header_theme_toggle()
     
-    # Simple header with just branding
-    st.title("🦙 RAG LlamaStack")
-    st.caption("Retrieval-Augmented Generation with LlamaStack & Ollama")
+    # Simple header with just branding and new feature highlight
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.title("🦙 RAG LlamaStack")
+        st.caption("Retrieval-Augmented Generation with LlamaStack & Ollama")
+    
+    with col2:
+        # Feature highlight badge
+        st.markdown("""
+        <div style="
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+        🌐 NEW: Web URLs
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_sidebar():
@@ -120,6 +141,7 @@ def render_sidebar():
             **Current Setup:**
             - 🔍 Embeddings: all-MiniLM-L6-v2 (sentence-transformers)
             - 🧠 LLM: See Model Dashboard below
+            - 🌐 Web Processing: MCP Server + Fallback
             
             **Connection Issues?**
             - Use diagnostics in Model Dashboard
@@ -129,6 +151,7 @@ def render_sidebar():
             **Performance Tips:**
             - Add API providers for faster responses
             - Use local Ollama models for privacy
+            - Mix file uploads with web URLs for comprehensive knowledge base
             """)
         
         st.markdown("---")
@@ -136,7 +159,14 @@ def render_sidebar():
         # Model Dashboard
         render_model_dashboard()
         
-        # Document Upload Section
+        # Enhanced Content Sources Section with highlighting
+        st.markdown("### 📁 Content Sources")
+        
+        # Add a feature highlight for web content processing
+        if not has_documents():
+            st.info("🌟 **NEW:** Process web URLs in addition to file uploads!")
+        
+        # Document Upload & Web URL Section
         uploaded_files = render_file_uploader()
         
         if uploaded_files:
@@ -231,6 +261,56 @@ def render_sidebar():
                             st.error("❌ Ollama is not running")
                             st.info("💡 Start Ollama with: `ollama serve`")
             
+            # MCP Server diagnostic check
+            st.markdown("---")
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                if st.button("🌐 Test MCP Server", help="Check if MCP server is available for web content processing"):
+                    with st.spinner("Testing MCP Server..."):
+                        try:
+                            import subprocess
+                            result = subprocess.run(
+                                ["npx", "@just-every/mcp-read-website-fast", "--version"],
+                                capture_output=True,
+                                text=True,
+                                timeout=10
+                            )
+                            
+                            if result.returncode == 0:
+                                st.success("✅ MCP Server available")
+                                st.info("🔧 Web content extraction will use MCP server for optimal quality")
+                            else:
+                                st.warning("⚠️ MCP Server not available")
+                                st.info("🔄 Web content extraction will use fallback method")
+                        except Exception as e:
+                            st.warning("⚠️ MCP Server check failed")
+                            st.info("🔄 Fallback method will be used automatically")
+                            st.text(f"Details: {str(e)}")
+            
+            with col4:
+                if st.button("🧪 Test Web Processing", help="Test web content extraction with example URL"):
+                    with st.spinner("Testing web content extraction..."):
+                        try:
+                            # Initialize web processor if not exists
+                            if 'web_content_processor' not in st.session_state:
+                                from core.web_content_processor import WebContentProcessor
+                                st.session_state.web_content_processor = WebContentProcessor()
+                            
+                            # Test with example.com
+                            test_url = "https://example.com"
+                            processor = st.session_state.web_content_processor
+                            
+                            if processor.is_valid_url(test_url):
+                                st.success("✅ URL validation works")
+                                st.info("🌐 Web content processing is ready!")
+                                st.text("Try entering any URL in the 'Web URLs' tab")
+                            else:
+                                st.error("❌ URL validation failed")
+                        except Exception as e:
+                            st.error("❌ Web processing test failed")
+                            st.text(f"Error: {str(e)}")
+            
             # Debug information
             st.markdown("---")
             st.markdown("**🐛 Debug Information**")
@@ -241,7 +321,8 @@ def render_sidebar():
                     "Selected LLM": st.session_state.selected_llm_model,
                     "Selected Embedding": st.session_state.selected_embedding_model,
                     "Documents Loaded": len(st.session_state.uploaded_documents) if 'uploaded_documents' in st.session_state else 0,
-                    "Chat History": len(st.session_state.chat_history) if 'chat_history' in st.session_state else 0
+                    "Chat History": len(st.session_state.chat_history) if 'chat_history' in st.session_state else 0,
+                    "Web Processor Available": 'web_content_processor' in st.session_state
                 }
                 
                 st.json(debug_info)

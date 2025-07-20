@@ -1,0 +1,24 @@
+{
+  "name": "rag-llama-stack-mcp",
+  "version": "1.0.0",
+  "description": "MCP server integration for RAG LlamaStack web content processing",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "mcp-version": "npx @just-every/mcp-read-website-fast --version"
+  },
+  "keywords": [
+    "mcp",
+    "web-extraction",
+    "rag",
+    "llama-stack"
+  ],
+  "author": "RAG LlamaStack",
+  "license": "MIT",
+  "dependencies": {
+    "@just-every/mcp-read-website-fast": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

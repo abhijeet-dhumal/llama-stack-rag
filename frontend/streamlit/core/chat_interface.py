@@ -20,25 +20,26 @@ def render_welcome_screen() -> None:
     with col2:
         st.markdown("""
         <div style="text-align: center;">
-            <h2>Welcome to your personal knowledge assistant</h2>
+            <h2>Welcome to your intelligent knowledge assistant</h2>
             <p style="font-size: 1.1em; margin: 1.5rem 0;">
-                Upload documents to get started. I'll help you find information, answer questions, 
-                and explore your document collection.
+                Upload documents or process web URLs to get started. I'll help you find information, 
+                answer questions, and explore your knowledge base from multiple sources.
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Getting started card
-        st.info("""
-        **🎯 Get Started**
+        # Enhanced getting started card with web content highlight
+        st.success("""
+        **🎯 Get Started - Choose Your Source**
         
-        Upload your first document using the sidebar →
+        **📄 Upload Files** using the sidebar →  
+        *Supported formats: TXT, PDF, MD, DOCX, PPTX (Max 50MB)*
         
-        **Supported formats:** TXT, PDF, MD, DOCX, PPTX  
-        **Max size:** 50MB per file
+        **🌐 Process Web URLs** ✨ **NEW!**  
+        *Extract content from articles, docs, Wikipedia in real-time*
         """)
         
-        # Features overview
+        # Features overview with updated capabilities
         st.markdown("### ✨ What you can do:")
         
         col_a, col_b, col_c = st.columns(3)
@@ -46,21 +47,46 @@ def render_welcome_screen() -> None:
             st.markdown("""
             **📝 Ask Questions**
             
-            Query your documents with natural language
+            Query your documents and web content with natural language
             """)
         
         with col_b:
             st.markdown("""
-            **🔍 Search Content**
+            **🔍 Hybrid Search**
             
-            Find information across all uploaded files
+            Find information across files and web sources
             """)
         
         with col_c:
             st.markdown("""
-            **💡 Get Insights**
+            **💡 Real-time Processing**
             
-            Receive summaries and analysis
+            Instant embedding and analysis of web content
+            """)
+        
+        # New feature spotlight
+        st.markdown("---")
+        st.markdown("### 🌟 New Feature Spotlight")
+        
+        col_left, col_right = st.columns(2)
+        with col_left:
+            st.info("""
+            **🌐 Web Content Processing**
+            
+            - Uses MCP Server with Mozilla Readability
+            - Clean extraction from articles and documentation  
+            - Smart fallback for maximum compatibility
+            - Mixed with uploaded files in unified knowledge base
+            """)
+        
+        with col_right:
+            st.info("""
+            **🚀 Enhanced AI Pipeline**
+            
+            - LlamaStack orchestration for unified processing
+            - Sentence Transformers for high-quality embeddings
+            - Local Ollama models for privacy
+            - Real-time performance analytics
             """)
     
     st.markdown("<br>" * 2, unsafe_allow_html=True)

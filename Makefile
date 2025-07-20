@@ -1,157 +1,115 @@
-.PHONY: help install dev test lint format clean setup llamastack-start llamastack-stop llamastack-restart frontend-setup frontend start stop restart status health podman-build podman-up podman-down
+# RAG LlamaStack - Streamlit Edition
+# Makefile for easy development and deployment
+
+.PHONY: help setup setup-mcp install start stop clean test health status logs
 
 # Default target
 help:
-	@echo "🦙 RAG NotebookLM with LlamaStack"
-	@echo "================================="
+	@echo "🦙 RAG LlamaStack - Available Commands:"
 	@echo ""
-	@echo "🚀 Quick Start:"
-	@echo "  make setup    - Install dependencies and configure everything"
-	@echo "  make start    - Start LlamaStack + Frontend (complete app)"
-	@echo "  make status   - Check service health and show URLs"
-	@echo "  make stop     - Stop all services"
+	@echo "Setup Commands:"
+	@echo "  setup        - Complete setup (Python + MCP server)"
+	@echo "  setup-mcp    - Setup MCP server for web content processing"
+	@echo "  install      - Install Python dependencies only"
 	@echo ""
-	@echo "🔧 Individual Services:"
-	@echo "  make llamastack-start  - Start LlamaStack server only"
-	@echo "  make llamastack-stop   - Stop LlamaStack server"
-	@echo "  make frontend         - Start Streamlit frontend only"
-	@echo "  make frontend-stop    - Stop Streamlit frontend"
+	@echo "Run Commands:"
+	@echo "  start        - Start the Streamlit application"
+	@echo "  start-dev    - Start with debug logging"
 	@echo ""
-	@echo "🛠️  Development:"
-	@echo "  make test     - Run tests"
-	@echo "  make health   - Check service health"
-	@echo "  make restart  - Restart everything"
+	@echo "LlamaStack Commands:"
+	@echo "  llamastack   - Start LlamaStack server"
+	@echo "  ollama       - Start Ollama server"
 	@echo ""
-	@echo "🐳 Container Commands:"
-	@echo "  make podman-up    - Start with Podman containers"
-	@echo "  make podman-down  - Stop containers"
+	@echo "Test Commands:"
+	@echo "  test         - Run Python tests"
+	@echo "  test-web     - Test web content processing integration"
 	@echo ""
+	@echo "Utility Commands:"
+	@echo "  clean        - Clean cache and temporary files"
+	@echo "  health       - Check system health"
+	@echo "  status       - Show service status"
 
-# Install dependencies
+# Complete setup including MCP server
+setup: install setup-mcp
+	@echo "✅ Complete setup finished!"
+	@echo "   You can now run: make start"
+
+# Setup MCP server for web content processing
+setup-mcp:
+	@echo "🔧 Setting up MCP server for web content processing..."
+	@./setup_mcp.sh
+
+# Install Python dependencies
 install:
+	@echo "📦 Installing Python dependencies..."
 	pip install -r requirements.txt
 
-# Complete setup (run this first)
-setup: install frontend-setup
-	mkdir -p data/{documents,vectors,models,cache} logs llamastack/data/vectors
-	@echo "✅ Setup complete! You can now run: make start"
+# Start the Streamlit application
+start:
+	@echo "🚀 Starting RAG LlamaStack application..."
+	@echo "🌐 Open http://localhost:8501 in your browser"
+	streamlit run frontend/streamlit/app.py --server.port 8501
 
-# Setup Streamlit configuration (prevents first-time setup issues)
-frontend-setup:
-	@mkdir -p ~/.streamlit
-	@echo "[general]" > ~/.streamlit/config.toml
-	@echo "email = \"\"" >> ~/.streamlit/config.toml
-	@echo "" >> ~/.streamlit/config.toml
-	@echo "[server]" >> ~/.streamlit/config.toml
-	@echo "headless = true" >> ~/.streamlit/config.toml
-	@echo "port = 8501" >> ~/.streamlit/config.toml
-	@echo "" >> ~/.streamlit/config.toml
-	@echo "[browser]" >> ~/.streamlit/config.toml
-	@echo "gatherUsageStats = false" >> ~/.streamlit/config.toml
-	@echo "✅ Streamlit configuration created"
+# Start with debug logging
+start-dev:
+	@echo "🐛 Starting in development mode with debug logging..."
+	STREAMLIT_LOGGER_LEVEL=debug streamlit run frontend/streamlit/app.py --server.port 8501
 
-# Run development server
-dev:
-	source venv/bin/activate && uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+# Start LlamaStack server
+llamastack:
+	@echo "🦙 Starting LlamaStack server..."
+	llamastack run ./llamastack/config/llamastack-config.yaml
 
-# Stop any existing Streamlit processes
-frontend-stop:
-	@echo "🔄 Stopping Streamlit..."
-	@pkill -f "streamlit run" 2>/dev/null || echo "No Streamlit process found"
-
-# Run Streamlit frontend (NotebookLM-style RAG interface)
-frontend: frontend-stop
-	@echo "🎨 Starting RAG NotebookLM frontend..."
-	source venv/bin/activate && streamlit run frontend/streamlit/app.py --server.port 8501
-
-# Start complete RAG application (LlamaStack + Frontend)
-start: llamastack-start
-	@echo "⏳ Waiting for LlamaStack to be ready..."
-	@sleep 5
-	@make frontend
-
-# Stop everything
-stop: llamastack-stop frontend-stop
-	@echo "🛑 All services stopped"
-
-# Restart everything
-restart: stop start
+# Start Ollama server
+ollama:
+	@echo "🏠 Starting Ollama server..."
+	ollama serve
 
 # Run tests
 test:
-	pytest backend/tests/ -v
+	@echo "🧪 Running tests..."
+	python -m pytest tests/ -v
 
-# Code formatting
-format:
-	black backend/ frontend/
-	isort backend/ frontend/
+# Test web content processing integration
+test-web:
+	@echo "🌐 Testing web content processing integration..."
+	python test_web_integration.py
 
-# Development helpers
-dev-setup: install
-	mkdir -p data/{documents,vectors,models,cache} logs
-	cp .env.example .env
-	echo "Setup complete! Edit .env file with your configuration."
+# Clean cache and temporary files
+clean:
+	@echo "🧹 Cleaning cache and temporary files..."
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf .streamlit/cache 2>/dev/null || true
+	rm -rf node_modules/.cache 2>/dev/null || true
+	@echo "✅ Cleanup complete"
 
-# Health check for all services
+# Check system health
 health:
-	@echo "🔍 Checking service health..."
-	@echo "LlamaStack (port 8321):"
-	@curl -s http://localhost:8321/v1/providers >/dev/null 2>&1 && echo "  ✅ Running" || echo "  ❌ Not responding"
-	@echo "Streamlit Frontend (port 8501):"
-	@curl -s http://localhost:8501 >/dev/null 2>&1 && echo "  ✅ Running" || echo "  ❌ Not responding"
+	@echo "🩺 Checking system health..."
+	@echo ""
+	@echo "Python version:"
+	@python --version || echo "❌ Python not found"
+	@echo ""
+	@echo "Node.js version:"
+	@node --version || echo "❌ Node.js not found"
+	@echo ""
+	@echo "MCP server status:"
+	@npx @just-every/mcp-read-website-fast --version 2>/dev/null || echo "❌ MCP server not available"
+	@echo ""
+	@echo "Streamlit status:"
+	@streamlit --version || echo "❌ Streamlit not found"
+	@echo ""
+	@echo "LlamaStack status:"
+	@curl -s http://localhost:8321/v1/health > /dev/null && echo "✅ LlamaStack running" || echo "❌ LlamaStack not running"
+	@echo ""
+	@echo "Ollama status:"
+	@curl -s http://localhost:11434/api/version > /dev/null && echo "✅ Ollama running" || echo "❌ Ollama not running"
 
-# Show application status and URLs
+# Show service status
 status: health
-	@echo ""
-	@echo "📱 Application URLs:"
-	@echo "  • RAG NotebookLM UI: http://localhost:8501"
-	@echo "  • LlamaStack API: http://localhost:8321"
-	@echo "  • LlamaStack Docs: http://localhost:8321/docs"
-	@echo ""
-	@echo "🏗️  Architecture: Frontend → LlamaStack (no intermediate backend needed)"
-	@echo ""
 
-# LlamaStack server management
-llamastack-status:
-	@curl -s http://localhost:8321/v1/providers >/dev/null 2>&1 && echo "✅ LlamaStack is running" || echo "❌ LlamaStack is not running"
-
-llamastack-stop:
-	@echo "🔄 Stopping LlamaStack..."
-	@pkill -f "llama stack run" 2>/dev/null || echo "No LlamaStack process found"
-	@sleep 2
-
-llamastack-start: llamastack-stop
-	@echo "🚀 Starting LlamaStack..."
-	cd llamastack && source ../venv/bin/activate && llama stack run config/llamastack-config.yaml &
-	@echo "⏳ Waiting for LlamaStack to start..."
-	@sleep 10
-	@curl -s http://localhost:8321/v1/providers >/dev/null 2>&1 && echo "✅ LlamaStack started successfully" || echo "⚠️  LlamaStack may still be starting..."
-
-llamastack-restart: llamastack-stop llamastack-start
-
-# Podman commands (using files in podman/ directory)
-podman-build:
-	cd podman && podman-compose build
-
-podman-up:
-	cd podman && podman-compose up -d
-
-podman-down:
-	cd podman && podman-compose down
-
-podman-logs:
-	cd podman && podman-compose logs -f
-
-# Alternative: Use podman directly
-podman-build-direct:
-	podman build -f podman/Containerfile.api -t rag-notebooklm:latest .
-
-podman-run-direct:
-	podman run -d -p 8000:8000 -p 8501:8501 -p 5001:5001 --name rag-app rag-notebooklm:latest
-
-podman-stop-direct:
-	podman stop rag-app && podman rm rag-app
-
-# Clean Podman resources
-podman-clean:
-	podman system prune -f
+# Show logs (if any)
+logs:
+	@echo "📋 Recent logs:"
+	@ls -la logs/ 2>/dev/null || echo "No logs directory found"

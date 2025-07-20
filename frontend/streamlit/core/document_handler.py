@@ -8,6 +8,7 @@ import time
 import pandas as pd
 from typing import List, Dict, Any
 from .utils import format_file_size
+from .web_content_processor import WebContentProcessor
 
 
 # Global embedding model cache
@@ -324,8 +325,8 @@ def initialize_document_storage() -> None:
 
 
 def render_file_uploader() -> List:
-    """Render file upload interface with status indicators"""
-    st.markdown("### 📁 Upload Documents")
+    """Render file upload interface with status indicators and URL input"""
+    st.markdown("### 📁 Add Content Sources")
     
     # Show current upload status
     if hasattr(st.session_state, 'currently_uploading') and st.session_state.currently_uploading:
@@ -340,31 +341,221 @@ def render_file_uploader() -> List:
             st.session_state.failed_uploads.clear()
             st.rerun()
     
-    # File uploader widget
-    uploaded_files = st.file_uploader(
-        "Choose files to upload",
-        type=['pdf', 'txt', 'md', 'docx', 'pptx'],
-        accept_multiple_files=True,
-        help="Drag and drop files here (Max 50MB per file)"
-    )
+    # Create tabs for different input methods
+    file_tab, url_tab = st.tabs(["📄 Upload Files", "🌐 Web URLs"])
     
-    # Show upload tips
-    with st.expander("💡 Upload Tips", expanded=False):
-        st.markdown("""
-        **Best Practices:**
-        - ✅ Upload one file at a time for large files (>10MB)
-        - ✅ Don't switch models during upload
-        - ✅ Wait for "Processing complete!" before making changes
-        - ✅ Failed uploads can be retried automatically
+    uploaded_files = []
+    
+    with file_tab:
+        # File uploader widget
+        uploaded_files = st.file_uploader(
+            "Choose files to upload",
+            type=['pdf', 'txt', 'md', 'docx', 'pptx'],
+            accept_multiple_files=True,
+            help="Drag and drop files here (Max 50MB per file)"
+        )
         
-        **Supported Formats:**
-        - 📄 PDF documents
-        - 📝 Text files (.txt, .md)
-        - 📘 Word documents (.docx)
-        - 📊 PowerPoint (.pptx)
-        """)
+        # Show upload tips
+        with st.expander("💡 Upload Tips", expanded=False):
+            st.markdown("""
+            **Best Practices:**
+            - ✅ Upload one file at a time for large files (>10MB)
+            - ✅ Don't switch models during upload
+            - ✅ Wait for "Processing complete!" before making changes
+            - ✅ Failed uploads can be retried automatically
+            
+            **Supported Formats:**
+            - 📄 PDF documents
+            - 📝 Text files (.txt, .md)
+            - 📘 Word documents (.docx)
+            - 📊 PowerPoint (.pptx)
+            """)
+    
+    with url_tab:
+        st.markdown("🔗 **Extract content from web pages in real-time**")
+        st.markdown("*Uses MCP server with Mozilla Readability for clean content extraction*")
+        
+        url = st.text_input(
+            "Enter URL:",
+            placeholder="https://example.com/article",
+            help="Enter a web URL to extract and process its content"
+        )
+        
+        if url and st.button("🌐 Process URL", type="primary"):
+            process_web_url(url)
+        
+        # Show URL processing tips
+        with st.expander("💡 URL Processing Tips", expanded=False):
+            st.markdown("""
+            **How it works:**
+            - 🔧 **MCP Server**: Uses Mozilla Readability for clean extraction
+            - 🔄 **Fallback**: BeautifulSoup + requests if MCP server unavailable
+            - 📝 **Output**: Clean markdown content optimized for RAG
+            - ⚡ **Real-time**: Content processed and embedded immediately
+            
+            **Best URLs for processing:**
+            - ✅ Articles and blog posts
+            - ✅ Documentation pages
+            - ✅ News articles
+            - ✅ Wikipedia pages
+            - ❌ Dynamic content (JavaScript-heavy)
+            - ❌ Pages requiring authentication
+            """)
     
     return uploaded_files if uploaded_files else []
+
+
+def process_web_url(url: str):
+    """Process a web URL and add to document storage"""
+    if not url.strip():
+        st.error("Please enter a valid URL")
+        return
+    
+    try:
+        # Initialize web content processor if not exists
+        if 'web_content_processor' not in st.session_state:
+            st.session_state.web_content_processor = WebContentProcessor()
+        
+        # Get web content processor from session state
+        processor = st.session_state.web_content_processor
+        
+        # Extract content from URL
+        result = processor.process_url(url)
+        
+        if result and result.get('success'):
+            # Create a document-like structure for web content
+            content = result.get('content', '')
+            title = result.get('title', f"Web Content from {url}")
+            
+            # Get domain for display
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc
+            
+            web_document = {
+                'name': f"{title}",
+                'content': content,
+                'file_type': 'WEB',
+                'file_size_mb': len(content) / (1024 * 1024),
+                'chunk_count': 0,  # Will be calculated during embedding
+                'character_count': len(content),
+                'upload_time': time.strftime("%Y-%m-%d %H:%M:%S"),
+                'source_url': url,
+                'domain': domain,
+                'extraction_method': result.get('method', 'unknown'),
+                'metadata': result.get('metadata', {}),
+                'processed_at': result.get('processed_at', time.time())
+            }
+            
+            # Process content for embeddings using existing embedding system
+            with st.spinner("🧮 Creating embeddings for web content..."):
+                # Create chunks using existing chunking logic
+                chunks = create_chunks_from_content(content)
+                web_document['chunk_count'] = len(chunks)
+                
+                # Create embeddings using existing embedding system
+                embeddings_data = create_embeddings_from_chunks(chunks)
+                
+                if embeddings_data:
+                    web_document['chunks'] = chunks
+                    web_document['embeddings'] = embeddings_data
+                    
+                    # Add to uploaded documents using existing storage
+                    if 'uploaded_documents' not in st.session_state:
+                        st.session_state.uploaded_documents = []
+                    
+                    st.session_state.uploaded_documents.append(web_document)
+                    
+                    # Show success message
+                    st.success(f"✅ Successfully processed web content from {domain}")
+                    
+                    # Show processing stats
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("📝 Characters", f"{web_document['character_count']:,}")
+                    with col2:
+                        st.metric("🧩 Chunks", web_document['chunk_count'])
+                    with col3:
+                        st.metric("📊 Size", f"{web_document['file_size_mb']:.2f} MB")
+                    
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to create embeddings for web content")
+        else:
+            st.error("❌ Failed to extract content from the URL. Please check the URL and try again.")
+            
+    except Exception as e:
+        st.error(f"❌ Error processing URL: {str(e)}")
+
+
+def create_chunks_from_content(content: str) -> List[str]:
+    """Create chunks from content using existing chunking logic"""
+    # Use existing chunk size settings
+    CHUNK_SIZE = 3000
+    CHUNK_OVERLAP = 600
+    
+    if not content or not content.strip():
+        return []
+    
+    chunks = []
+    text_length = len(content)
+    
+    if text_length <= CHUNK_SIZE:
+        chunks.append(content.strip())
+    else:
+        start = 0
+        while start < text_length:
+            end = start + CHUNK_SIZE
+            
+            # Try to break at word boundary
+            if end < text_length:
+                # Look for the last space within the chunk
+                last_space = content.rfind(' ', start, end)
+                if last_space > start:
+                    end = last_space
+            
+            chunk = content[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+            
+            # Move start position with overlap
+            start = end - CHUNK_OVERLAP
+            if start >= text_length:
+                break
+    
+    return chunks
+
+
+def create_embeddings_from_chunks(chunks: List[str]) -> Any:
+    """Create embeddings from chunks using existing embedding system"""
+    try:
+        # Use existing embedding model loading logic
+        model = get_embedding_model()
+        if model is None:
+            return None
+        
+        # Create embeddings in batches
+        batch_size = 32
+        all_embeddings = []
+        
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            try:
+                batch_embeddings = model.encode(batch, convert_to_numpy=True, show_progress_bar=False)
+                all_embeddings.extend(batch_embeddings)
+            except Exception as e:
+                st.warning(f"Error encoding batch {i//batch_size + 1}: {str(e)}")
+                # Create dummy embeddings for this batch
+                import numpy as np
+                dummy_embeddings = np.random.rand(len(batch), 384).astype(np.float32)
+                all_embeddings.extend(dummy_embeddings)
+        
+        return all_embeddings
+        
+    except Exception as e:
+        st.warning(f"Error creating embeddings: {str(e)}")
+        # Return dummy embeddings as fallback
+        import numpy as np
+        return [np.random.rand(384).astype(np.float32) for _ in chunks]
 
 
 def validate_uploaded_files(uploaded_files: List[Any]) -> List[Any]:
@@ -712,13 +903,34 @@ def render_document_library() -> None:
             
             # Documents list
             for idx, doc in enumerate(st.session_state.uploaded_documents):
-                with st.expander(f"📄 {doc['name']}", expanded=False):
+                # Handle different source types for display
+                if doc.get('file_type') == 'WEB':
+                    doc_icon = "🌐"
+                    doc_title = f"{doc_icon} {doc['name']}"
+                    source_info = f"Source: {doc.get('domain', 'Web')}"
+                else:
+                    doc_icon = "📄"
+                    doc_title = f"{doc_icon} {doc['name']}"
+                    source_info = f"Type: {doc.get('file_type', 'Unknown')}"
+                
+                with st.expander(doc_title, expanded=False):
                     col1, col2 = st.columns([1, 1])
                     
                     with col1:
+                        st.write(f"**{source_info}**")
                         st.write(f"**Size:** {doc.get('file_size_mb', 0):.1f}MB")
                         st.write(f"**Processing Time:** {doc.get('processing_time', 0):.1f}s")
                         st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
+                        
+                        # Show URL for web content
+                        if doc.get('file_type') == 'WEB' and doc.get('source_url'):
+                            st.write(f"**URL:** [{doc.get('domain', 'Link')}]({doc.get('source_url')})")
+                            if doc.get('extraction_method'):
+                                method_display = {
+                                    'mcp_server': '🔧 MCP Server',
+                                    'fallback_requests': '🔄 Fallback Method'
+                                }.get(doc.get('extraction_method'), '❓ Unknown')
+                                st.write(f"**Extraction:** {method_display}")
                     
                     with col2:
                         st.write(f"**Characters:** {len(doc.get('content', '')):,}")

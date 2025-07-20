@@ -36,6 +36,7 @@ make setup && make start
 
 ### 🔥 **Core Capabilities**
 - **📄 Multi-format Document Processing** - PDF, DOCX, PPTX, TXT, MD (up to 50MB)
+- **🌐 Real-time Web Content Extraction** - Process any web URL using MCP server with Mozilla Readability
 - **🤖 Intelligent Q&A** - Context-aware responses with source citations
 - **🔍 Semantic Search** - Advanced embedding-based document retrieval
 - **⚡ Real-time Processing** - Live progress tracking and performance metrics
@@ -53,6 +54,13 @@ make setup && make start
 - **🏠 Local Model Support** - Ollama integration for privacy-focused AI
 - **🧮 Sentence Transformers** - High-quality embeddings with all-MiniLM-L6-v2
 - **🔀 Fallback Systems** - Multiple AI provider support with auto-switching
+
+### 🌐 **Web Content Processing (NEW!)**
+- **🔧 MCP Server Integration** - Uses @just-every/mcp-read-website-fast for clean content extraction
+- **📝 Mozilla Readability** - Advanced web content parsing with readability optimization
+- **🔄 Smart Fallback** - BeautifulSoup + requests backup when MCP server unavailable
+- **⚡ Real-time Embedding** - URLs processed and vectorized instantly for immediate search
+- **🎯 Multiple Sources** - Mix file uploads and web URLs in the same knowledge base
 
 ---
 
@@ -344,8 +352,10 @@ streamlit run frontend/streamlit/app.py --server.port 8501
 
 1. **Open** http://localhost:8501
 2. **Check System Status** in the top-left sidebar
-3. **Upload Documents** using the file uploader
-4. **Start Chatting** with your documents!
+3. **Add Content Sources:**
+   - 📄 **Upload Documents** using the file uploader (PDF, DOCX, PPTX, TXT, MD)
+   - 🌐 **Process Web URLs** by entering any web link for real-time content extraction
+4. **Start Chatting** with your documents and web content!
 
 ---
 
