@@ -1,282 +1,182 @@
-# 🚀 **RAG NotebookLM with LlamaStack**
+# 🦙 **RAG LlamaStack - Streamlit Edition**
 
-> **A modern, lightweight RAG application that behaves like Google NotebookLM**  
-> Built with LlamaStack orchestration and optimized for M4 MacBooks
+> **A modern, intelligent RAG application with real-time document processing**  
+> Built with LlamaStack orchestration and Streamlit for seamless AI interactions
+
+## ⚡ **30-Second Start**
+
+```bash
+git clone https://github.com/yourusername/rag-llama-stack.git
+cd rag-llama-stack
+python -m venv venv && source venv/bin/activate
+make setup && make start
+# Open: http://localhost:8501
+```
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![LlamaStack](https://img.shields.io/badge/LlamaStack-0.0.40+-green.svg)](https://github.com/meta-llama/llama-stack)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io)
+[![LlamaStack](https://img.shields.io/badge/LlamaStack-Latest-green.svg)](https://github.com/meta-llama/llama-stack)
 
 ---
 
 ## 📋 **Table of Contents**
 
-1. [System Architecture](#system-architecture)
-2. [LlamaStack Integration](#llamastack-integration)  
-3. [Data Flow & Processing](#data-flow--processing)
-4. [Features](#features)
-5. [Quick Start](#quick-start)
-6. [Development](#development)
-7. [API Documentation](#api-documentation)
+1. [🎯 Features](#-features)
+2. [🏛️ System Architecture](#-system-architecture)
+3. [🔄 Data Flow & Processing](#-data-flow--processing)
+4. [🚀 Quick Start](#-quick-start)
+5. [📊 Performance & Monitoring](#-performance--monitoring)
+6. [🔧 Configuration](#-configuration)
+7. [🐛 Troubleshooting](#-troubleshooting)
+
+---
+
+## 🎯 **Features**
+
+### 🔥 **Core Capabilities**
+- **📄 Multi-format Document Processing** - PDF, DOCX, PPTX, TXT, MD (up to 50MB)
+- **🤖 Intelligent Q&A** - Context-aware responses with source citations
+- **🔍 Semantic Search** - Advanced embedding-based document retrieval
+- **⚡ Real-time Processing** - Live progress tracking and performance metrics
+- **🎨 Modern UI** - Dark/light theme with responsive design
+
+### 🛠️ **Advanced Features**
+- **📊 System Status Monitoring** - Real-time LlamaStack and Ollama health checks
+- **🩺 Connection Diagnostics** - Smart endpoint detection and troubleshooting
+- **📈 Performance Analytics** - Detailed processing metrics and statistics
+- **🔄 Upload State Management** - Interrupt-resistant file processing
+- **🔍 Debug Tools** - Comprehensive system diagnostics and logging
+
+### 🧠 **AI Integration**
+- **🦙 LlamaStack Orchestration** - Unified API for inference and embeddings
+- **🏠 Local Model Support** - Ollama integration for privacy-focused AI
+- **🧮 Sentence Transformers** - High-quality embeddings with all-MiniLM-L6-v2
+- **🔀 Fallback Systems** - Multiple AI provider support with auto-switching
 
 ---
 
 ## 🏛️ **System Architecture**
 
-### **High-Level Architecture Overview**
+### **Current Streamlit-Only Architecture**
 
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
-        UI[Streamlit UI<br/>📱 Document Upload & Chat]
-        UPLOAD[📄 File Upload Component]
+    subgraph "🎨 Frontend Layer (Streamlit)"
+        UI[📱 Main Interface]
+        SIDEBAR[🔧 Control Sidebar]
         CHAT[💬 Chat Interface]
-        SOURCES[📚 Source Management]
-        AUDIO[🎵 Audio Player]
+        UPLOAD[📁 File Upload]
+        STATUS[🔌 System Status]
+        DIAG[🩺 Diagnostics]
     end
     
-    subgraph "API Gateway Layer"
-        API[FastAPI Server<br/>🌐 Main API Endpoints]
-        WS[WebSocket Handler<br/>⚡ Real-time Chat]
-        MIDDLEWARE[🔒 CORS & Auth Middleware]
+    subgraph "🧠 Core Processing"
+        DOC_HANDLER[📄 Document Handler]
+        CHAT_ENGINE[💬 Chat Engine]
+        MODEL_MGR[🤖 Model Manager]
+        THEME_MGR[🎨 Theme Manager]
     end
     
-    subgraph "LlamaStack Orchestration Hub"
-        LS[🦙 LlamaStack Server<br/>Core Orchestrator]
-        ROUTER[🔀 Request Router]
-        PROVIDERS[🧩 Provider Manager]
+    subgraph "🦙 LlamaStack Integration"
+        LS_CLIENT[🔗 LlamaStack Client]
+        EMBED_API[🧮 Embeddings API]
+        CHAT_API[💬 Chat Completion API]
+        HEALTH_API[💓 Health Check API]
     end
     
-    subgraph "Document Processing Pipeline"
-        INGEST[📥 Document Ingester<br/>PDF, DOCX, URL, MD]
-        EXTRACT[🔤 Text Extractor<br/>Clean Content Output]
-        CHUNK[✂️ Smart Chunker<br/>Semantic Boundaries]
-        EMBED[🧮 Embedding Service<br/>Granite Embeddings]
+    subgraph "🏠 Local AI (Ollama)"
+        OLLAMA[🦙 Ollama Server]
+        LOCAL_LLM[🤖 Local LLM Models]
+        MODEL_PULL[⬇️ Model Management]
     end
     
-    subgraph "LlamaStack Providers"
-        INF_PROV[🤖 Inference Provider<br/>Granite-3.3-8B-Instruct]
-        EMB_PROV[🧮 Embedding Provider<br/>Granite-Embedding-30M]
-        VEC_PROV[🗄️ Vector Provider<br/>SQLite-Vec]
-        MEM_PROV[🧠 Memory Provider<br/>Conversation Buffer]
-        SAFE_PROV[🛡️ Safety Provider<br/>Granite Guardian]
-    end
-    
-    subgraph "Storage Layer"
-        VDB[(🔍 Vector Database<br/>SQLite-Vec)]
-        META[(📊 Metadata Store<br/>Document Info)]
-        FILES[(📁 File Storage<br/>Raw Documents)]
-    end
-    
-    subgraph "M4 Optimization Layer"
-        MPS[⚡ Metal Performance Shaders]
-        ARM[🏗️ ARM64 Native Libraries]
-        CACHE[💾 Intelligent Caching]
+    subgraph "💾 Storage & State"
+        SESSION[🔄 Session State]
+        VECTOR_DB[🗄️ Vector Storage]
+        DOC_STORE[📊 Document Storage]
+        CACHE[⚡ Performance Cache]
     end
     
     %% User Interactions
-    UI --> API
-    UPLOAD --> API
-    CHAT --> WS
+    UI --> SIDEBAR
+    SIDEBAR --> STATUS
+    SIDEBAR --> UPLOAD
+    SIDEBAR --> DIAG
+    UI --> CHAT
     
-    %% API to LlamaStack
-    API --> LS
-    WS --> LS
+    %% Core Processing Flow
+    UPLOAD --> DOC_HANDLER
+    CHAT --> CHAT_ENGINE
+    STATUS --> MODEL_MGR
+    DIAG --> MODEL_MGR
     
-    %% LlamaStack Internal Flow
-    LS --> ROUTER
-    ROUTER --> PROVIDERS
-    PROVIDERS --> INF_PROV
-    PROVIDERS --> EMB_PROV
-    PROVIDERS --> VEC_PROV
-    PROVIDERS --> MEM_PROV
-    PROVIDERS --> SAFE_PROV
+    %% LlamaStack Integration
+    DOC_HANDLER --> LS_CLIENT
+    CHAT_ENGINE --> LS_CLIENT
+    MODEL_MGR --> LS_CLIENT
+    LS_CLIENT --> EMBED_API
+    LS_CLIENT --> CHAT_API
+    LS_CLIENT --> HEALTH_API
     
-    %% Document Processing Pipeline
-    API --> INGEST
-    INGEST --> EXTRACT
-    EXTRACT --> CHUNK
-    CHUNK --> EMB_PROV
-    EMB_PROV --> VEC_PROV
-    VEC_PROV --> VDB
-    EXTRACT --> META
+    %% Ollama Fallback
+    LS_CLIENT -.->|Fallback| OLLAMA
+    MODEL_MGR --> OLLAMA
+    OLLAMA --> LOCAL_LLM
+    OLLAMA --> MODEL_PULL
     
-    %% RAG Query Flow
-    CHAT --> INF_PROV
-    INF_PROV --> VEC_PROV
-    VEC_PROV --> VDB
-    VDB --> INF_PROV
-    INF_PROV --> SAFE_PROV
-    SAFE_PROV --> CHAT
+    %% Storage Layer
+    DOC_HANDLER --> SESSION
+    CHAT_ENGINE --> SESSION
+    SESSION --> VECTOR_DB
+    SESSION --> DOC_STORE
+    SESSION --> CACHE
     
-    %% M4 Optimization
-    INF_PROV --> MPS
-    EMB_PROV --> ARM
-    VEC_PROV --> CACHE
-    
-    %% Storage Connections
-    META --> FILES
-    VDB --> FILES
+    style UI fill:#e3f2fd
+    style LS_CLIENT fill:#fff3e0
+    style OLLAMA fill:#e8f5e8
+    style SESSION fill:#fce4ec
 ```
 
-### **Microservices Architecture**
+### **Technology Stack**
 
 ```mermaid
 graph LR
-    subgraph "Client Tier"
-        WEB[🌐 Web UI<br/>Streamlit]
-        MOBILE[📱 Mobile<br/>Future]
+    subgraph "🖥️ Frontend"
+        ST[Streamlit 1.28+]
+        CSS[Custom CSS/JS]
+        PD[Pandas DataFrames]
     end
     
-    subgraph "API Tier"
-        GATEWAY[🚪 API Gateway<br/>FastAPI]
-        AUTH[🔐 Auth Service<br/>JWT]
-        RATE[⏱️ Rate Limiter<br/>Redis]
+    subgraph "🤖 AI/ML"
+        LS[LlamaStack API]
+        ST_EMB[Sentence Transformers]
+        OL[Ollama]
+        HF[Hugging Face]
     end
     
-    subgraph "Business Logic Tier"
-        DOC[📄 Document Service<br/>Processing Pipeline]
-        CHAT[💬 Chat Service<br/>Q&A Logic]
-        EMBED[🧮 Embedding Service<br/>Vector Generation]
-        SEARCH[🔍 Search Service<br/>Similarity Search]
+    subgraph "📊 Data Processing"
+        DOC[Docling]
+        PDF[PyPDF2]
+        NP[NumPy]
+        JSON[JSON Storage]
     end
     
-    subgraph "LlamaStack Tier"
-        LLAMA[🦙 LlamaStack<br/>Orchestrator]
-        INF[🤖 Inference<br/>Granite LLM]
-        VEC[🗄️ Vector Store<br/>SQLite-Vec]
-        MEM[🧠 Memory<br/>Context]
+    subgraph "🔧 Infrastructure"
+        PY[Python 3.12+]
+        REQ[Requests]
+        SUB[Subprocess]
+        OS[OS Integration]
     end
     
-    subgraph "Data Tier"
-        DB[(🗃️ PostgreSQL<br/>Metadata)]
-        CACHE[(⚡ Redis<br/>Cache)]
-        FILES[(📁 File System<br/>Documents)]
-    end
-    
-    WEB --> GATEWAY
-    MOBILE --> GATEWAY
-    GATEWAY --> AUTH
-    GATEWAY --> DOC
-    GATEWAY --> CHAT
-    
-    DOC --> EMBED
-    CHAT --> SEARCH
-    EMBED --> LLAMA
-    SEARCH --> LLAMA
-    
-    LLAMA --> INF
-    LLAMA --> VEC
-    LLAMA --> MEM
-    
-    DOC --> DB
-    CHAT --> CACHE
-    EMBED --> FILES
-```
-
----
-
-## 🦙 **LlamaStack Integration**
-
-### **Provider Configuration Matrix**
-
-| Provider Type | Implementation | Model/Service | Configuration |
-|---------------|---------------|---------------|---------------|
-| **🤖 Inference** | `meta-reference` | Granite-3.3-8B-Instruct | MPS, FP16, 4K context |
-| **🧮 Embedding** | `meta-reference` | Granite-Embedding-30M | MPS, FP16, 512 tokens |
-| **🗄️ Vector Store** | `sqlite-vec` | SQLite-Vec | Local DB, 384 dims |
-| **🧠 Memory** | `simple` | Conversation Buffer | 8K token limit |
-| **🛡️ Safety** | `meta-reference` | Granite Guardian | Content filtering |
-
-### **LlamaStack Request Flow**
-
-```mermaid
-sequenceDiagram
-    participant Client as 📱 Client
-    participant API as 🌐 FastAPI
-    participant LS as 🦙 LlamaStack
-    participant Inf as 🤖 Inference
-    participant Emb as 🧮 Embedding
-    participant Vec as 🗄️ Vector Store
-    participant Safe as 🛡️ Safety
-    
-    Note over Client,Safe: Document Upload Flow
-    Client->>API: POST /documents (PDF)
-    API->>LS: Process Document
-    LS->>Emb: Generate Embeddings
-    Emb-->>LS: Vector Embeddings
-    LS->>Vec: Store Vectors + Metadata
-    Vec-->>LS: Storage Confirmation
-    LS-->>API: Processing Complete
-    API-->>Client: Document ID + Status
-    
-    Note over Client,Safe: Q&A Query Flow
-    Client->>API: POST /chat/query
-    API->>LS: RAG Query Request
-    LS->>Emb: Query Embedding
-    Emb-->>LS: Query Vector
-    LS->>Vec: Similarity Search
-    Vec-->>LS: Top-K Chunks
-    LS->>Inf: Generate Response
-    Inf-->>LS: Raw Response
-    LS->>Safe: Safety Check
-    Safe-->>LS: Filtered Response
-    LS-->>API: Final Answer + Citations
-    API-->>Client: Streamed Response
-```
-
-### **Provider Initialization Code**
-
-```python
-# llamastack/providers/granite_setup.py
-from llama_stack.client import LlamaStackClient
-
-async def initialize_llamastack():
-    """Initialize LlamaStack with M4-optimized providers"""
-    
-    client = LlamaStackClient(
-        base_url="http://localhost:5001",
-        timeout=30.0
-    )
-    
-    # Configure Inference Provider
-    inference_config = {
-        "provider_type": "meta-reference",
-        "config": {
-            "model": "meta-llama/Llama-3.3-8B-Instruct",
-            "device": "mps",  # M4 Metal Performance Shaders
-            "torch_dtype": "float16",
-            "max_seq_len": 4096,
-            "max_batch_size": 1
-        }
-    }
-    
-    # Configure Embedding Provider
-    embedding_config = {
-        "provider_type": "meta-reference",
-        "config": {
-            "model": "meta-llama/Llama-Guard-3-30M-Embedding",
-            "device": "mps",
-            "torch_dtype": "float16",
-            "max_seq_len": 512
-        }
-    }
-    
-    # Configure Vector Store
-    vector_config = {
-        "provider_type": "sqlite-vec",
-        "config": {
-            "db_path": "./data/vectors/main.db",
-            "embedding_dim": 384,
-            "similarity_metric": "cosine"
-        }
-    }
-    
-    return client
-
-# Usage in FastAPI app
-async def create_llamastack_client():
-    return await initialize_llamastack()
+    ST --> LS
+    ST --> CSS
+    ST --> PD
+    LS --> ST_EMB
+    LS --> OL
+    DOC --> PDF
+    DOC --> NP
+    ST --> DOC
 ```
 
 ---
@@ -287,292 +187,325 @@ async def create_llamastack_client():
 
 ```mermaid
 flowchart TD
-    START([📥 Document Upload]) --> DETECT{🔍 File Type Detection}
+    START([📁 File Upload]) --> VALIDATE{🔍 Validation}
     
-    DETECT -->|PDF| PDF[📄 PDF Processor<br/>pdfplumber]
-    DETECT -->|DOCX| DOCX[📝 DOCX Processor<br/>python-docx]
-    DETECT -->|URL| URL[🌐 URL Processor<br/>newspaper3k/trafilatura]
-    DETECT -->|MD/TXT| TEXT[📝 Text Processor<br/>direct read]
+    VALIDATE -->|✅ Valid| STATE_TRACK[🔄 State Tracking<br/>Mark as uploading]
+    VALIDATE -->|❌ Invalid| ERROR[❌ Error Display<br/>Size/type limits]
     
-    PDF --> CLEAN[🧹 Text Cleaning<br/>Remove artifacts]
-    DOCX --> CLEAN
-    URL --> CLEAN
-    TEXT --> CLEAN
+    STATE_TRACK --> EXTRACT[📄 Content Extraction<br/>Multi-format support]
+    EXTRACT --> OPTIMIZE[🚀 Performance Optimization<br/>Large file handling]
     
-    CLEAN --> CHUNK[✂️ Smart Chunking<br/>Semantic boundaries]
-    CHUNK --> METADATA[📊 Extract Metadata<br/>Title, author, date]
+    OPTIMIZE --> CHUNK[✂️ Smart Chunking<br/>3000 chars + 600 overlap]
+    CHUNK --> BATCH[📦 Batch Processing<br/>Optimized embedding generation]
     
-    METADATA --> EMBED[🧮 Generate Embeddings<br/>Granite Embedding Model]
-    EMBED --> STORE_VEC[🗄️ Store Vectors<br/>SQLite-Vec Database]
-    EMBED --> STORE_META[📊 Store Metadata<br/>SQLite Database]
+    BATCH --> EMBED[🧮 Generate Embeddings<br/>all-MiniLM-L6-v2]
+    EMBED --> QUALITY[🎯 Quality Check<br/>Validate embeddings]
     
-    STORE_VEC --> INDEX[🔍 Update Search Index]
-    STORE_META --> INDEX
-    INDEX --> COMPLETE([✅ Processing Complete])
+    QUALITY -->|✅ Success| STORE[💾 Store Document<br/>Session state + backup]
+    QUALITY -->|⚠️ Partial| FALLBACK[🧪 Dummy Embeddings<br/>Ensure functionality]
+    
+    STORE --> METRICS[📊 Performance Metrics<br/>Speed, quality, stats]
+    FALLBACK --> METRICS
+    METRICS --> COMPLETE([✅ Processing Complete])
+    
+    STATE_TRACK -.->|Interruption| RETRY[🔄 Mark for Retry<br/>State management]
+    RETRY -.-> STATE_TRACK
     
     style START fill:#e1f5fe
     style COMPLETE fill:#e8f5e8
     style EMBED fill:#fff3e0
-    style STORE_VEC fill:#f3e5f5
+    style METRICS fill:#f3e5f5
+    style ERROR fill:#ffebee
 ```
 
-### **RAG Query Processing**
+### **Chat & Query Processing**
 
 ```mermaid
 flowchart TD
-    QUERY([💬 User Query]) --> PREPROCESS[🔧 Query Preprocessing<br/>Clean & validate]
+    QUERY([💬 User Question]) --> CHECK{📊 Documents Available?}
     
-    PREPROCESS --> EMBED_Q[🧮 Query Embedding<br/>Granite Embedding]
-    EMBED_Q --> SEARCH[🔍 Vector Similarity Search<br/>SQLite-Vec cosine similarity]
+    CHECK -->|❌ No| NO_DOCS[📝 No Documents Message<br/>Upload prompt]
+    CHECK -->|✅ Yes| EMBED_Q[🧮 Query Embedding<br/>all-MiniLM-L6-v2]
     
-    SEARCH --> FILTER{🎯 Relevance Filter<br/>Score > threshold}
-    FILTER -->|Pass| RERANK[📊 Rerank Results<br/>By relevance score]
-    FILTER -->|Fail| FALLBACK[🤖 Fallback Response<br/>No relevant docs found]
+    EMBED_Q --> SEARCH[🔍 Similarity Search<br/>Cosine similarity]
+    SEARCH --> FILTER[🎯 Relevance Filtering<br/>Threshold: 0.25]
     
-    RERANK --> CONTEXT[📝 Build Context<br/>Top-K chunks + metadata]
-    CONTEXT --> PROMPT[📋 Prompt Template<br/>System + context + query]
+    FILTER --> RERANK[📊 Chunk Reranking<br/>Diversity + relevance]
+    RERANK --> CONTEXT[📝 Context Building<br/>6000 char limit]
     
-    PROMPT --> LLM[🤖 LLM Inference<br/>Granite-3.3-8B-Instruct]
-    LLM --> SAFETY[🛡️ Safety Check<br/>Granite Guardian]
+    CONTEXT --> PROMPT[📋 Prompt Engineering<br/>System + context + query]
+    PROMPT --> TRY_LS[🦙 Try LlamaStack<br/>Multiple endpoints]
     
-    SAFETY --> CITATIONS[📚 Extract Citations<br/>Map sources to response]
-    CITATIONS --> RESPONSE[📤 Final Response<br/>Answer + citations]
+    TRY_LS -->|✅ Success| RESPONSE[📤 AI Response<br/>With citations]
+    TRY_LS -->|❌ Failed| TRY_OLLAMA[🏠 Try Ollama Fallback<br/>Local processing]
     
-    FALLBACK --> RESPONSE
-    RESPONSE --> STREAM([📡 Stream to Client])
+    TRY_OLLAMA -->|✅ Success| RESPONSE
+    TRY_OLLAMA -->|❌ Failed| FALLBACK_RESP[🤖 Structured Fallback<br/>Context-based response]
     
-    style QUERY fill:#e1f5fe
-    style STREAM fill:#e8f5e8
-    style LLM fill:#fff3e0
-    style SAFETY fill:#ffebee
+    RESPONSE --> SOURCES[📚 Extract Sources<br/>Top 3 documents]
+    FALLBACK_RESP --> SOURCES
+    SOURCES --> DISPLAY[📱 Display Response<br/>Chat interface]
+    
+    NO_DOCS --> DISPLAY
+    
+    style QUERY fill:#e3f2fd
+    style RESPONSE fill:#e8f5e8
+    style FALLBACK_RESP fill:#fff3e0
+    style NO_DOCS fill:#ffebee
 ```
 
----
+### **System Health & Diagnostics**
 
-## ✨ **Features**
-
-### **🎯 Core Capabilities**
-- **📄 Multi-Format Document Support**: PDF, DOCX, TXT, Markdown, URLs
-- **🧠 Intelligent Q&A**: Contextual responses with source citations
-- **🔍 Semantic Search**: Vector-based similarity search with reranking
-- **💬 Real-time Chat**: Streaming responses with typing indicators
-- **📚 Source Management**: Upload, view, organize, and delete documents
-- **🎵 Audio Summaries**: Text-to-speech generation for document overviews
-- **🛡️ Safety Guardrails**: Content filtering and response validation
-- **⚡ M4 Optimization**: Native Apple Silicon performance tuning
-
-### **🔧 Technical Features**
-- **🦙 LlamaStack Integration**: Provider-based architecture
-- **🚀 Async Processing**: Background document processing
-- **💾 Intelligent Caching**: Response and embedding caching
-- **📊 Performance Monitoring**: Real-time metrics and health checks
-- **🐳 Containerized Deployment**: Docker and docker-compose ready
-- **🔐 Security**: API rate limiting and input validation
+```mermaid
+flowchart TD
+    MONITOR([🔌 System Monitor]) --> CHECK_LS[🦙 Check LlamaStack<br/>Health endpoint]
+    MONITOR --> CHECK_OL[🏠 Check Ollama<br/>Model list]
+    
+    CHECK_LS -->|✅ Online| LS_DIAG[🩺 LlamaStack Diagnostics<br/>Endpoint discovery]
+    CHECK_LS -->|❌ Offline| LS_ERROR[❌ Connection Issues<br/>Show recommendations]
+    
+    CHECK_OL -->|✅ Running| OL_MODELS[📦 List Models<br/>Available models]
+    CHECK_OL -->|❌ Offline| OL_ERROR[❌ Ollama Down<br/>Installation guide]
+    
+    LS_DIAG --> TEST_ENDPOINTS[📡 Test Endpoints<br/>Models, chat, embeddings]
+    TEST_ENDPOINTS --> RECOMMEND[💡 Recommendations<br/>Fix suggestions]
+    
+    OL_MODELS --> MODEL_STATUS[📊 Model Status<br/>Local vs remote]
+    
+    RECOMMEND --> STATUS_UI[📱 Status Display<br/>Real-time indicators]
+    MODEL_STATUS --> STATUS_UI
+    LS_ERROR --> STATUS_UI
+    OL_ERROR --> STATUS_UI
+    
+    style MONITOR fill:#e3f2fd
+    style STATUS_UI fill:#e8f5e8
+    style LS_ERROR fill:#ffebee
+    style OL_ERROR fill:#ffebee
+```
 
 ---
 
 ## 🚀 **Quick Start**
 
 ### **Prerequisites**
-- Python 3.12+
-- M4 MacBook (or compatible ARM64/x86_64)
-- 8GB+ RAM recommended
-- 10GB+ free disk space
+- **Python 3.12+** (recommended)
+- **Git** for cloning
+- **8GB+ RAM** for local models
+- **Optional**: Ollama for local AI processing
 
-### **1. Clone & Setup**
+### **Installation & Setup**
+
 ```bash
-git clone https://github.com/abhijeet-dhumal/rag-notebooklm-llama-stack.git
-cd rag-notebooklm-llama-stack
+# 1. Clone the repository
+git clone https://github.com/yourusername/rag-llama-stack.git
+cd rag-llama-stack
 
-# Create virtual environment
+# 2. Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
-make install
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Setup LlamaStack (automated)
+make setup
+
+# 5. Start the application
+make start
 ```
 
-### **2. Environment Configuration**
+### **Alternative: Manual Setup**
+
 ```bash
-# Copy environment template
-cp .env.example .env
+# Start LlamaStack server
+llamastack run ./llamastack/config/llamastack-config.yaml
 
-# Edit configuration (optional)
-nano .env
+# In another terminal, start Streamlit
+streamlit run frontend/streamlit/app.py --server.port 8501
 ```
 
-### **3. Start Services**
-```bash
-# Start LlamaStack server (Terminal 1)
-make llamastack-start
+### **First Time Usage**
 
-# Start backend API (Terminal 2)
-make dev
-
-# Start frontend UI (Terminal 3)
-make frontend
-```
-
-### **4. Access Application**
-- **Frontend UI**: http://localhost:8501
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **LlamaStack**: http://localhost:5001
+1. **Open** http://localhost:8501
+2. **Check System Status** in the top-left sidebar
+3. **Upload Documents** using the file uploader
+4. **Start Chatting** with your documents!
 
 ---
 
-## 🛠️ **Development**
+## 📊 **Performance & Monitoring**
 
-### **Project Structure**
-```
-rag-notebooklm-llama-stack/
-├── backend/                 # FastAPI backend
-│   ├── api/                # API endpoints
-│   ├── core/               # Business logic
-│   ├── models/             # Data models
-│   └── config/             # Configuration
-├── frontend/               # Streamlit frontend
-│   ├── streamlit/          # Streamlit app
-│   └── react/              # React app (future)
-├── llamastack/             # LlamaStack configuration
-│   ├── config/             # Provider configs
-│   └── providers/          # Custom providers
-├── data/                   # Data storage
-│   ├── documents/          # Uploaded files
-│   ├── vectors/            # Vector database
-│   └── models/             # Downloaded models
-└── docs/                   # Documentation
-```
+### **Real-time System Status**
 
-### **Development Commands**
-```bash
-# Code formatting
-make format
+The application provides comprehensive monitoring:
 
-# Run tests
-make test
+- **🟢 LlamaStack** - Connection and endpoint health
+- **🟢 Ollama** - Local model availability  
+- **📊 Performance Metrics** - Processing speed and quality
+- **🔍 Debug Information** - Configuration and state details
 
-# Health check
-make health
+### **Document Processing Metrics**
 
-# Clean cache
-make clean
+Each upload provides detailed analytics:
 
-# Docker build
-make docker-build
-```
+| Metric | Description | Typical Range |
+|--------|-------------|---------------|
+| **Processing Speed** | MB/second throughput | 0.2-1.0 MB/s |
+| **Embedding Quality** | Success rate percentage | 95-100% |
+| **Chunk Efficiency** | Characters per chunk | 2500-3500 |
+| **Memory Usage** | Session state size | <50MB |
 
-### **Adding New Document Types**
-1. Create processor in `backend/core/document_processor/`
-2. Register in `backend/core/document_processor/__init__.py`
-3. Add MIME type detection
-4. Update API documentation
+### **Performance Optimization**
 
-### **Extending LlamaStack Providers**
-1. Implement provider in `llamastack/providers/`
-2. Update configuration in `llamastack/config/`
-3. Register provider in initialization
+The system automatically optimizes for:
+- **Large Files**: Batch processing and content filtering
+- **Slow Networks**: Fallback systems and local processing
+- **Memory**: Efficient chunk management and cleanup
+- **Speed**: Parallel operations and smart caching
 
 ---
 
-## 📚 **API Documentation**
+## 🔧 **Configuration**
 
-### **Key Endpoints**
-
-| Method | Endpoint | Description | Request | Response |
-|--------|----------|-------------|---------|----------|
-| `POST` | `/api/v1/documents` | Upload document | `multipart/form-data` | `DocumentResponse` |
-| `POST` | `/api/v1/documents/url` | Add from URL | `URLUpload` | `DocumentResponse` |
-| `GET` | `/api/v1/documents` | List documents | Query params | `DocumentList` |
-| `POST` | `/api/v1/chat/query` | Ask question | `ChatQuery` | `ChatResponse` |
-| `GET` | `/api/v1/health` | Health check | None | `HealthStatus` |
-
-### **Example Usage**
+### **Main Configuration** (`frontend/streamlit/core/config.py`)
 
 ```python
-import httpx
+# Model Configuration
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+DEFAULT_LLM_MODEL = "llama3.2:1b"
 
-# Upload document
-async with httpx.AsyncClient() as client:
-    with open("document.pdf", "rb") as f:
-        response = await client.post(
-            "http://localhost:8000/api/v1/documents",
-            files={"file": f},
-            data={"title": "My Document"}
-        )
-    document = response.json()
+# Processing Configuration  
+CHARS_PER_CHUNK = 3000
+CHUNK_OVERLAP = 600
+MAX_RELEVANT_CHUNKS = 4
 
-# Ask question
-query_response = await client.post(
-    "http://localhost:8000/api/v1/chat/query",
-    json={
-        "query": "What are the main points?",
-        "document_ids": [document["id"]]
-    }
-)
-answer = query_response.json()
+# Performance Configuration
+MIN_SIMILARITY_THRESHOLD = 0.25
+LLM_TEMPERATURE = 0.4
+LLM_MAX_TOKENS = 1024
 ```
 
-For complete API documentation, visit: http://localhost:8000/docs
+### **Streamlit Configuration** (`.streamlit/config.toml`)
+
+```toml
+[server]
+maxUploadSize = 50
+port = 8501
+
+[theme]
+primaryColor = "#667eea"
+backgroundColor = "#ffffff"
+
+[browser]
+gatherUsageStats = false
+```
+
+### **LlamaStack Configuration** (`llamastack/config/llamastack-config.yaml`)
+
+```yaml
+built_at: '2024-12-XX'
+image_type: conda
+
+apis:
+  - inference
+  - safety  
+  - agents
+  - memory
+  - telemetry
+
+providers:
+  inference:
+    - provider_id: ollama
+      provider_type: remote::ollama
+      config:
+        url: http://localhost:11434
+```
 
 ---
 
-## 🏆 **Performance & Optimization**
+## 🐛 **Troubleshooting**
 
-### **M4 MacBook Optimizations**
-- **🔥 Metal Performance Shaders**: GPU acceleration for inference
-- **⚡ ARM64 Native**: Optimized libraries for Apple Silicon
-- **💾 Unified Memory**: Efficient memory allocation
-- **🧮 Mixed Precision**: FP16 for faster inference
+### **Common Issues & Solutions**
 
-### **Performance Metrics**
-- **Response Time**: <3 seconds for typical queries
-- **Throughput**: 50+ concurrent users
-- **Memory Usage**: <8GB total system memory
-- **Storage**: Efficient vector compression
+#### 🔴 **LlamaStack Connection Failed**
+```bash
+# Check if LlamaStack is running
+curl http://localhost:8321/v1/health
+
+# Restart LlamaStack
+make restart
+
+# Check configuration
+cat llamastack/config/llamastack-config.yaml
+```
+
+#### 🔴 **Ollama Not Found**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Start Ollama service
+ollama serve
+
+# Pull a model
+ollama pull llama3.2:1b
+```
+
+#### 🔴 **File Upload Fails**
+- Check file size (max 50MB)
+- Verify file format (PDF, DOCX, PPTX, TXT, MD)
+- Don't switch models during upload
+- Use "Retry" if interrupted
+
+#### 🔴 **Poor Response Quality**
+- Upload more relevant documents
+- Check embedding quality in performance metrics
+- Verify model configuration
+- Use connection diagnostics
+
+### **Debug Mode**
+
+Enable detailed logging:
+
+```bash
+# Set debug environment
+export STREAMLIT_LOGGER_LEVEL=debug
+
+# Run with verbose output
+streamlit run frontend/streamlit/app.py --logger.level debug
+```
+
+### **Getting Help**
+
+1. **Connection Diagnostics** - Use the built-in diagnostic tools
+2. **Performance Metrics** - Check the detailed performance tables
+3. **Debug Information** - Use the debug panel in the sidebar
+4. **Logs** - Check `logs/` directory for detailed error logs
 
 ---
 
-## 📖 **Documentation**
-
-This README contains complete project documentation including:
-
-- **🏛️ System Architecture**: Complete architecture diagrams and component details
-- **🦙 LlamaStack Integration**: Provider configuration and usage patterns  
-- **🔄 Data Flow**: Document processing and RAG query pipelines
-- **🚀 Quick Start**: Step-by-step setup and running instructions
-- **🛠️ Development**: Project structure and development guidelines
-- **📚 API Reference**: Key endpoints and usage examples
-
-### **Additional Reference Files**
-- **[API Specification](./api_specification.yaml)**: Complete OpenAPI 3.0 specification
-- **[Sprint Plan](./3DAY_SPRINT_PLAN.md)**: Development roadmap and implementation timeline
-
----
-
-## 🤝 **Contributing**
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
----
-
-## 📄 **License**
+## 📜 **License**
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 **Acknowledgments**
+## 🤝 **Contributing**
 
-- **Meta AI**: LlamaStack framework and Granite models
-- **FastAPI**: High-performance web framework
-- **Streamlit**: Rapid UI development
-- **SQLite-Vec**: Efficient vector storage
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
-**🚀 Happy RAG Building!** For questions and support, please open an issue on GitHub.
+## ⭐ **Star History**
+
+If you find this project useful, please consider giving it a star! ⭐
+
+---
+
+*Built with ❤️ using LlamaStack, Streamlit, and modern AI technologies*

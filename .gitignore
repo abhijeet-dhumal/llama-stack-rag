@@ -35,6 +35,7 @@ MANIFEST
 .env.development.local
 .env.test.local
 .env.production.local
+*.env
 
 # IDE & Editor Files
 .vscode/
@@ -49,6 +50,10 @@ MANIFEST
 .Trashes
 ehthumbs.db
 Thumbs.db
+.vimrc
+.vim/
+*.sublime-project
+*.sublime-workspace
 
 # Testing
 .tox/
@@ -66,6 +71,7 @@ coverage.xml
 
 # Jupyter Notebooks
 .ipynb_checkpoints
+*.ipynb
 
 # Documentation
 docs/_build/
@@ -86,39 +92,171 @@ data/cache/*
 !data/models/.gitkeep
 !data/cache/.gitkeep
 
+# AI/ML Model Files
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.pkl
+*.pickle
+*.joblib
+*.model
+*.onnx
+*.pb
+*.tflite
+*.mlmodel
+*.safetensors
+
+# Vector Database Files
+*.faiss
+*.index
+*.ann
+*.hnsw
+chroma/
+pinecone/
+weaviate/
+qdrant/
+
+# Embedding & Feature Files
+embeddings/
+features/
+*.npy
+*.npz
+*.hdf5
+
 # Logs
 logs/*.log
+logs/*
 *.log
+*.out
+*.err
 
 # Database files
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
 
 # Temporary files
 tmp/
 temp/
 .tmp
+*.tmp
+*.temp
+*~
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.save
+.backup/
+backup/
 
 # LlamaStack specific
 llamastack/models/*
+llamastack/data/*
 !llamastack/models/.gitkeep
+!llamastack/data/.gitkeep
 
-# Docker
+# Ollama specific
+.ollama/
+ollama-models/
+
+# Streamlit specific
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+streamlit-*.log
+
+# Allow config.toml to be tracked
+!.streamlit/config.toml
+
+# Container & Deployment files
+*.tar
+*.tar.gz
+*.zip
+*.rar
 .dockerignore
+docker-compose.override.yml
+Dockerfile.dev
+kubernetes/
+k8s/
+helm/
 
 # MacOS
 .DS_Store
 .AppleDouble
 .LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
 
 # Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
 
 # Linux
 *~
+.directory
+.Trash-*
 
-# Streamlit
-.streamlit/secrets.toml
+# Session & Runtime files
+.session_state
+*.session
+runtime/
+sessions/
+*.pid
+*.lock
+
+# Security & Keys
+*.key
+*.pem
+*.crt
+*.cert
+*.p12
+*.pfx
+secrets/
+.secrets/
+api_keys.txt
+credentials.json
+
+# Performance & Profiling
+*.prof
+*.pyprof
+.benchmarks/
+profiling/
+
+# Generated files
+generated/
+output/
+results/
+artifacts/
+checkpoints/
+
+# Node.js (if using any frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Research & Experiments
+experiments/
+notebooks/
+research/
+*.research
+*.experiment

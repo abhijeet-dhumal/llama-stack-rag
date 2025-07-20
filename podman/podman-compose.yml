@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  api:
+    build:
+      context: .
+      dockerfile: Containerfile.api
+    container_name: rag-api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=RAG NotebookLM
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LLAMASTACK_BASE_URL=http://llamastack:5001
+      - DATABASE_URL=sqlite:///./data/app.db
+      - VECTOR_DB_PATH=./data/vectors/main.db
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - llamastack
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # LlamaStack Service
+  llamastack:
+    build:
+      context: .
+      dockerfile: Containerfile.llamastack
+    container_name: rag-llamastack
+    ports:
+      - "5001:5001"
+    environment:
+      - PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+    volumes:
+      - ./data/models:/app/models
+      - ./data/vectors:/app/vectors
+      - ./llamastack/config:/app/config
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # Frontend Service (Streamlit)
+  frontend:
+    build:
+      context: .
+      dockerfile: Containerfile.frontend
+    container_name: rag-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+volumes:
+  redis_data:
+
+networks:
+  rag-network:
+    driver: bridge 

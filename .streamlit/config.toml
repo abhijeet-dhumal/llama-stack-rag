@@ -1,0 +1,41 @@
+[server]
+# Maximum file upload size in MB
+maxUploadSize = 50
+
+# Enable file watcher for better development experience
+fileWatcherType = "auto"
+
+# Server configuration
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+# Automatically open browser on start
+gatherUsageStats = false
+showErrorDetails = true
+
+[theme]
+# Default theme settings (can be overridden by custom CSS)
+primaryColor = "#667eea"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+
+[client]
+# Show error details for debugging
+showErrorDetails = true
+toolbarMode = "auto"
+
+[logger]
+# Set logging level
+level = "info"
+
+[runner]
+# Automatically rerun on file changes during development
+fastReruns = true
+enforceSerializableSessionState = false
+
+[global]
+# Development mode disabled to allow custom port
+developmentMode = false 

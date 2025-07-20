@@ -1,0 +1,79 @@
+version: '2'
+image_name: rag-local-ollama-stack
+
+# APIs for RAG application
+apis:
+- inference
+- vector_io
+
+# Provider configuration with Ollama support
+providers:
+  inference:
+  # Local sentence-transformers for embeddings
+  - provider_id: sentence-transformers
+    provider_type: inline::sentence-transformers
+    config: {}
+    
+  # Ollama for local LLM inference (no API keys needed!)
+  - provider_id: ollama
+    provider_type: remote::ollama
+    config:
+      url: http://localhost:11434
+      
+  # Optional: Add other providers with API keys
+  # - provider_id: openai
+  #   provider_type: remote::openai
+  #   config:
+  #     api_key: ${OPENAI_API_KEY}
+    
+  vector_io:
+  # FAISS for vector storage
+  - provider_id: faiss
+    provider_type: inline::faiss
+    config:
+      kvstore:
+        type: sqlite
+        db_path: ./data/vectors/faiss_store.db
+
+# Metadata store
+metadata_store:
+  type: sqlite
+  db_path: ./data/vectors/registry.db
+
+# Model definitions
+models:
+# Local embedding model (always available)
+- model_id: all-MiniLM-L6-v2
+  provider_id: sentence-transformers
+  model_type: embedding
+  metadata:
+    embedding_dimension: 384
+
+# Ollama LLM models (install with: ollama pull <model>)
+- model_id: llama3.2
+  provider_id: ollama
+  model_type: llm
+  provider_model_id: llama3.2
+
+- model_id: llama3.2:3b
+  provider_id: ollama  
+  model_type: llm
+  provider_model_id: llama3.2:3b
+
+- model_id: codellama
+  provider_id: ollama
+  model_type: llm
+  provider_model_id: codellama
+
+- model_id: mistral
+  provider_id: ollama
+  model_type: llm
+  provider_model_id: mistral
+
+# Server configuration  
+server:
+  port: 8321
+
+# Safety and tool groups (optional)
+shields: []
+tool_groups: [] 
