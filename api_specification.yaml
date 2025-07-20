@@ -1,0 +1,558 @@
+openapi: 3.0.3
+info:
+  title: NotebookLM-like RAG API
+  version: 1.0.0
+  description: |
+    A comprehensive API for document-based question answering system
+    Built with LlamaStack and optimized for M4 MacBooks
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.example.com/v1
+    description: Production server
+
+paths:
+  # Document Management
+  /documents/upload:
+    post:
+      summary: Upload a document file
+      tags: [Documents]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file (PDF, DOCX, TXT, MD)
+                metadata:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                    description:
+                      type: string
+      responses:
+        '201':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+
+  /documents/url:
+    post:
+      summary: Add document from URL
+      tags: [Documents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  example: "https://example.com/article"
+                metadata:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    tags:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        '201':
+          description: URL processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: URL processing failed
+
+  /documents:
+    get:
+      summary: List all documents
+      tags: [Documents]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in document titles and content
+      responses:
+        '200':
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentSummary'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /documents/{document_id}:
+    get:
+      summary: Get document details
+      tags: [Documents]
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete a document
+      tags: [Documents]
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Document deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Chat and Q&A
+  /chat/query:
+    post:
+      summary: Ask a question about documents
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  example: "What are the main findings in the research papers?"
+                document_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Specific documents to search (empty = all)
+                options:
+                  type: object
+                  properties:
+                    max_chunks:
+                      type: integer
+                      default: 5
+                      minimum: 1
+                      maximum: 20
+                    temperature:
+                      type: number
+                      default: 0.1
+                      minimum: 0.0
+                      maximum: 2.0
+                    stream:
+                      type: boolean
+                      default: false
+                    include_citations:
+                      type: boolean
+                      default: true
+      responses:
+        '200':
+          description: Question answered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-sent events for streaming responses
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /chat/history:
+    get:
+      summary: Get chat conversation history
+      tags: [Chat]
+      parameters:
+        - name: session_id
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+
+  # Audio Generation
+  /audio/generate:
+    post:
+      summary: Generate audio summary
+      tags: [Audio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: Text to convert to speech
+                voice:
+                  type: string
+                  enum: [male, female, neutral]
+                  default: neutral
+                speed:
+                  type: number
+                  default: 1.0
+                  minimum: 0.5
+                  maximum: 2.0
+      responses:
+        '200':
+          description: Audio generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audio_url:
+                    type: string
+                    format: uri
+                  duration:
+                    type: number
+                    description: Duration in seconds
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # System Endpoints
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  components:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      llamastack:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      vector_store:
+                        type: string
+                        enum: [healthy, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /metrics:
+    get:
+      summary: Get system metrics
+      tags: [System]
+      responses:
+        '200':
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests_per_minute:
+                    type: number
+                  average_response_time:
+                    type: number
+                  memory_usage:
+                    type: object
+                    properties:
+                      total_mb:
+                        type: number
+                      used_mb:
+                        type: number
+                      percentage:
+                        type: number
+                  model_performance:
+                    type: object
+                    properties:
+                      inference_time_ms:
+                        type: number
+                      embedding_time_ms:
+                        type: number
+
+components:
+  schemas:
+    DocumentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content_preview:
+          type: string
+        metadata:
+          type: object
+          properties:
+            file_size:
+              type: integer
+            file_type:
+              type: string
+            language:
+              type: string
+            chunk_count:
+              type: integer
+        created_at:
+          type: string
+          format: date-time
+        processing_status:
+          type: string
+          enum: [pending, processing, completed, failed]
+
+    DocumentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content_preview:
+          type: string
+          description: First 200 characters
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        chunk_count:
+          type: integer
+
+    DocumentDetail:
+      allOf:
+        - $ref: '#/components/schemas/DocumentSummary'
+        - type: object
+          properties:
+            content:
+              type: string
+              description: Full document content
+            chunks:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  content:
+                    type: string
+                  chunk_index:
+                    type: integer
+
+    ChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        citations:
+          type: array
+          items:
+            type: object
+            properties:
+              document_id:
+                type: string
+                format: uuid
+              chunk_id:
+                type: string
+                format: uuid
+              relevance_score:
+                type: number
+              snippet:
+                type: string
+              page_number:
+                type: integer
+        response_time_ms:
+          type: number
+        model_used:
+          type: string
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          properties:
+            model_used:
+              type: string
+            response_time_ms:
+              type: number
+            citations:
+              type: array
+              items:
+                type: object
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    FileTooLarge:
+      description: File size exceeds limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Documents
+    description: Document upload and management
+  - name: Chat
+    description: Question answering and chat functionality
+  - name: Audio
+    description: Audio generation and TTS
+  - name: System
+    description: System monitoring and health checks 

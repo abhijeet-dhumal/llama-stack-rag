@@ -1,0 +1,46 @@
+# LlamaStack M4 Configuration
+api_server:
+  host: "0.0.0.0"
+  port: 5001
+
+# Provider Configuration
+providers:
+  inference:
+    provider_type: "meta-reference"
+    config:
+      model: "meta-llama/Llama-3.3-8B-Instruct"
+      max_seq_len: 4096
+      max_batch_size: 1
+      device: "mps"  # Metal Performance Shaders for M4
+      torch_dtype: "float16"
+      
+  embedding:
+    provider_type: "meta-reference" 
+    config:
+      model: "meta-llama/Llama-Guard-3-30M-Embedding"
+      max_seq_len: 512
+      device: "mps"
+      torch_dtype: "float16"
+      
+  vector_store:
+    provider_type: "sqlite-vec"
+    config:
+      db_path: "./data/vectors/main.db"
+      embedding_dim: 384
+      
+  memory:
+    provider_type: "simple"
+    config:
+      max_tokens: 8192
+
+# Model downloads
+models:
+  - model_id: "meta-llama/Llama-3.3-8B-Instruct"
+    provider: "meta-reference"
+    metadata:
+      torch_dtype: "float16"
+      
+  - model_id: "meta-llama/Llama-Guard-3-30M-Embedding"  
+    provider: "meta-reference"
+    metadata:
+      torch_dtype: "float16"
