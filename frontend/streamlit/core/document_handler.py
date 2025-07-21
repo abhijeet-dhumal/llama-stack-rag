@@ -325,23 +325,21 @@ def initialize_document_storage() -> None:
 
 
 def render_file_uploader() -> List:
-    """Render file upload interface with status indicators and URL input"""
-    
+    """Render file upload interface with original layout"""
     # Show current upload status
     if hasattr(st.session_state, 'currently_uploading') and st.session_state.currently_uploading:
         uploading_files = [file_id.split('_')[0] for file_id in st.session_state.currently_uploading]
-        st.info(f"⏳ Currently uploading: {', '.join(uploading_files)}")
+        st.warning(f"⏳ Currently uploading: {', '.join(uploading_files)}")
         st.warning("⚠️ Don't change models during upload!")
     
     if hasattr(st.session_state, 'failed_uploads') and st.session_state.failed_uploads:
         failed_count = len(st.session_state.failed_uploads)
         st.error(f"🔄 {failed_count} file(s) need retry due to interruption")
-        if st.button("🗑️ Clear failed uploads"):
+        if st.button("🗑️ Clear failed uploads", type="secondary"):
             st.session_state.failed_uploads.clear()
             st.rerun()
     
-    # Create input method selector with radio buttons for better state preservation
-    # Initialize input method state
+    # Input method selector
     if 'input_method' not in st.session_state:
         st.session_state.input_method = "📄 Upload Files"
     
@@ -355,7 +353,6 @@ def render_file_uploader() -> List:
     uploaded_files = []
     
     if input_method == "📄 Upload Files":
-        # File uploader widget
         uploaded_files = st.file_uploader(
             "Choose files to upload",
             type=['pdf', 'txt', 'md', 'docx', 'pptx'],
@@ -363,7 +360,7 @@ def render_file_uploader() -> List:
             help="Drag and drop files here (Max 50MB per file)"
         )
         
-        # Show upload tips
+        # Upload tips in collapsible
         with st.expander("💡 Upload Tips", expanded=False):
             st.markdown("""
             **Best Practices:**
@@ -380,10 +377,10 @@ def render_file_uploader() -> List:
             """)
     
     elif input_method == "🌐 Web URLs":
-        st.markdown("🔗 **Extract content from web pages in real-time**")
-        st.markdown("*Uses MCP server with Mozilla Readability for clean content extraction*")
+        st.info("🔗 Extract content from web pages in real-time")
+        st.info("Uses MCP server with Mozilla Readability for clean content extraction")
         
-        # Use a form for better UX and to prevent tab switching
+        # URL processing form
         with st.form("web_url_form"):
             url = st.text_input(
                 "Enter URL:",
@@ -396,7 +393,7 @@ def render_file_uploader() -> List:
             if submitted and url:
                 process_web_url(url)
         
-        # Show URL processing tips
+        # URL processing tips
         with st.expander("💡 URL Processing Tips", expanded=False):
             st.markdown("""
             **How it works:**
@@ -549,7 +546,7 @@ def create_embeddings_from_chunks(chunks: List[str]) -> Any:
     """Create embeddings from chunks using existing embedding system"""
     try:
         # Use existing embedding model loading logic
-        model = get_embedding_model()
+        model = get_local_embedding_model()
         if model is None:
             return None
         
@@ -768,24 +765,22 @@ def process_uploaded_files(files: List[Any]) -> int:
 
 
 def render_document_library() -> None:
-    """Render the document library interface with performance metrics"""
+    """Render the document library interface with original layout"""
     # Try to restore data first in case it was lost
     restore_documents_data()
     
-    # Get total document count from both collections
+    # Get total document count
     doc_count = get_document_count()
     
     # Debug: Check document state at render time
     if doc_count == 0:
-        print(f"⚠️ Document library render: no documents found in either collection")
+        print(f"⚠️ Document library render: no documents found")
     else:
         print(f"✅ Document library render: found {doc_count} documents")
     
     st.markdown("---")
     
-    # Ensure session state exists for both collections
-    if 'documents' not in st.session_state:
-        st.session_state.documents = []
+    # Ensure session state exists
     if 'uploaded_documents' not in st.session_state:
         st.session_state.uploaded_documents = []
     
@@ -806,8 +801,8 @@ def render_document_library() -> None:
             total_chunks = sum(doc.get("chunk_count", 0) for doc in all_documents)
             total_chars = sum(len(doc.get("content", "")) for doc in all_documents)
             
-            # Quick stats bar (always visible)
-            st.info(f"📊 **{doc_count}** documents • **{total_size_mb:.1f}MB** total • **{total_chunks}** chunks")
+            # Quick stats
+            st.info(f"📊 {doc_count} documents • {total_size_mb:.1f}MB total • {total_chunks} chunks")
             
             # Embedding Quality Summary
             real_embeddings = sum(doc.get('chunk_count', 0) - doc.get('embedding_errors', 0) for doc in all_documents)
@@ -815,16 +810,21 @@ def render_document_library() -> None:
             embedding_quality = (real_embeddings / total_embeddings * 100) if total_embeddings > 0 else 0
             
             if embedding_quality > 80:
-                quality_color = "🟢"
                 quality_status = "Excellent"
+                st.success(f"🎯 Embedding Quality: {embedding_quality:.1f}% ({real_embeddings}/{total_embeddings}) - {quality_status}")
             elif embedding_quality > 50:
-                quality_color = "🟡"
                 quality_status = "Good"
+                st.warning(f"🎯 Embedding Quality: {embedding_quality:.1f}% ({real_embeddings}/{total_embeddings}) - {quality_status}")
             else:
-                quality_color = "🔴"
                 quality_status = "Needs Improvement"
+                st.error(f"🎯 Embedding Quality: {embedding_quality:.1f}% ({real_embeddings}/{total_embeddings}) - {quality_status}")
             
-            st.info(f"{quality_color} **Embedding Quality**: {embedding_quality:.1f}% ({real_embeddings}/{total_embeddings}) - {quality_status}")
+            # Clear all button
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("🗑️ Clear All", type="secondary", help="Remove all documents"):
+                    clear_all_documents()
+                    st.rerun()
             
             # Detailed Performance Results Table (in dropdown)
             with st.expander("📊 Detailed Performance Results", expanded=False):
@@ -926,65 +926,15 @@ def render_document_library() -> None:
                         hide_index=True
                     )
             
-            # Clear all button
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if st.button("🗑️ Clear All", help="Remove all documents"):
-                    clear_all_documents()
-                    st.rerun()
+            # Simple document list
+            for i, doc in enumerate(all_documents):
+                with st.expander(f"📄 {doc['name']}", expanded=False):
+                    st.write(f"**Size:** {doc.get('file_size_mb', 0):.2f} MB")
+                    st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
+                    if st.button(f"🗑️ Remove", key=f"remove_{i}"):
+                        remove_document(i)
+                        st.rerun()
             
-            # Documents list
-            for idx, doc in enumerate(all_documents):
-                # Handle different source types for display
-                if doc.get('file_type') == 'WEB':
-                    doc_icon = "🌐"
-                    doc_title = f"{doc_icon} {doc['name']}"
-                    source_info = f"Source: {doc.get('domain', 'Web')}"
-                else:
-                    doc_icon = "📄"
-                    doc_title = f"{doc_icon} {doc['name']}"
-                    source_info = f"Type: {doc.get('file_type', 'Unknown')}"
-                
-                with st.expander(doc_title, expanded=False):
-                    col1, col2 = st.columns([1, 1])
-                    
-                    with col1:
-                        st.write(f"**{source_info}**")
-                        st.write(f"**Size:** {doc.get('file_size_mb', 0):.1f}MB")
-                        st.write(f"**Processing Time:** {doc.get('processing_time', 0):.1f}s")
-                        st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
-                        
-                        # Show URL for web content
-                        if doc.get('file_type') == 'WEB' and doc.get('source_url'):
-                            st.write(f"**URL:** [{doc.get('domain', 'Link')}]({doc.get('source_url')})")
-                            if doc.get('extraction_method'):
-                                method_display = {
-                                    'mcp_server': '🔧 MCP Server',
-                                    'fallback_requests': '🔄 Fallback Method'
-                                }.get(doc.get('extraction_method'), '❓ Unknown')
-                                st.write(f"**Extraction:** {method_display}")
-                    
-                    with col2:
-                        st.write(f"**Characters:** {len(doc.get('content', '')):,}")
-                        st.write(f"**Embedding Errors:** {doc.get('embedding_errors', 0)}")
-                        
-                        # Show embedding quality
-                        chunk_count = doc.get('chunk_count', 0)
-                        embedding_errors = doc.get('embedding_errors', 0)
-                        if chunk_count > 0:
-                            quality = ((chunk_count - embedding_errors) / chunk_count) * 100
-                            real_count = chunk_count - embedding_errors
-                            if quality > 90:
-                                st.write(f"**Embeddings:** ✅ Excellent ({real_count}/{chunk_count}) - {quality:.0f}%")
-                            elif quality > 70:
-                                st.write(f"**Embeddings:** ⚠️ Good ({real_count}/{chunk_count}) - {quality:.0f}%")
-                            else:
-                                st.write(f"**Embeddings:** 🧪 Demo ({real_count}/{chunk_count}) - {quality:.0f}%")
-                        
-                        # Individual delete button
-                        if st.button(f"🗑️ Remove", key=f"remove_{idx}"):
-                            remove_document(idx)
-                            st.rerun()
         else:
             st.info("🔍 No documents uploaded yet. Upload some documents above to get started!")
 

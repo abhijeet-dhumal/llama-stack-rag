@@ -21,7 +21,7 @@ from core.chat_interface import render_welcome_screen, render_chat_interface
 
 
 def main():
-    """Main application function"""
+    """Main application function with Bootstrap styling"""
     # Configure page with menu items
     st.set_page_config(
         **PAGE_CONFIG,
@@ -52,6 +52,9 @@ def main():
         }
     )
     
+    # Load Bootstrap CSS
+    load_bootstrap_css()
+    
     # Initialize all systems
     initialize_theme()
     initialize_session_state()
@@ -76,6 +79,549 @@ def main():
         render_welcome_screen()
     else:
         render_chat_interface()
+
+
+def load_bootstrap_css():
+    """Load Bootstrap CSS and custom styles"""
+    st.markdown("""
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom Bootstrap overrides for Streamlit */
+        .stButton > button {
+            border-radius: 0.375rem !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        /* File uploader styling */
+        .stFileUploader > div {
+            border: 2px dashed #0d6efd !important;
+            border-radius: 0.375rem !important;
+            padding: 1rem !important;
+            text-align: center !important;
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Progress bar styling */
+        .stProgress > div > div > div {
+            background: linear-gradient(45deg, #0d6efd, #0b5ed7) !important;
+        }
+        
+        /* Alert styling */
+        .stAlert {
+            border-radius: 0.375rem !important;
+            border: none !important;
+        }
+        
+        /* Expander styling */
+        .streamlit-expanderHeader {
+            background-color: #f8f9fa !important;
+            border-radius: 0.375rem !important;
+            border: 1px solid #dee2e6 !important;
+        }
+        
+        /* Selectbox styling - Dark theme compatible */
+        .stSelectbox > div > div > div {
+            background-color: #3b3b3b !important;
+            border: 1px solid #555555 !important;
+            border-radius: 0.375rem !important;
+            color: #ffffff !important;
+            padding: 0.5rem !important;
+            min-height: 2.5rem !important;
+        }
+        
+        .stSelectbox > div > div > div:hover {
+            border-color: #0d6efd !important;
+            background-color: #4b4b4b !important;
+        }
+        
+        /* Selectbox dropdown options */
+        .stSelectbox > div > div > div > div {
+            background-color: #3b3b3b !important;
+            color: #ffffff !important;
+            border: 1px solid #555555 !important;
+        }
+        
+        /* Selectbox dropdown arrow */
+        .stSelectbox svg {
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }
+        
+        /* File uploader styling - Dark theme */
+        .stFileUploader > div {
+            border: 2px dashed #0d6efd !important;
+            border-radius: 0.375rem !important;
+            padding: 1rem !important;
+            text-align: center !important;
+            background-color: #2b2b2b !important;
+            color: #ffffff !important;
+        }
+        
+        .stFileUploader > div > div {
+            color: #ffffff !important;
+        }
+        
+        /* File uploader text visibility */
+        .stFileUploader p, .stFileUploader span, .stFileUploader div {
+            color: #ffffff !important;
+        }
+        
+        /* Radio button styling - Dark theme */
+        .stRadio > div > div > div {
+            color: #ffffff !important;
+        }
+        
+        .stRadio > div > div > div > label {
+            color: #ffffff !important;
+        }
+        
+        /* Text input styling - Dark theme */
+        .stTextInput > div > div > input {
+            background-color: #3b3b3b !important;
+            border-color: #555555 !important;
+            color: #ffffff !important;
+        }
+        
+        .stTextInput > div > div > input::placeholder {
+            color: #aaaaaa !important;
+        }
+        
+        /* Button styling - Theme-aware */
+        .stButton > button {
+            border-radius: 0.375rem !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        /* Dark theme button overrides */
+        [data-theme="dark"] .stButton > button {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+        
+        [data-theme="dark"] .stButton > button:hover {
+            background-color: #0b5ed7 !important;
+            border-color: #0b5ed7 !important;
+        }
+        
+        /* Light theme button overrides */
+        [data-theme="light"] .stButton > button {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+        
+        [data-theme="light"] .stButton > button:hover {
+            background-color: #0b5ed7 !important;
+            border-color: #0b5ed7 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Force white text for light theme buttons with higher specificity */
+        body:not([data-theme="dark"]) .stButton > button {
+            color: #ffffff !important;
+        }
+        
+        html body:not([data-theme="dark"]) .stButton > button {
+            color: #ffffff !important;
+        }
+        
+        /* Maximum specificity for light theme button text */
+        html body:not([data-theme="dark"]) .stButton > button,
+        html body:not([data-theme="dark"]) .stButton > button span,
+        html body:not([data-theme="dark"]) .stButton > button div,
+        html body:not([data-theme="dark"]) .stButton > button p {
+            color: #ffffff !important;
+        }
+        
+        /* Form submit button styling - Theme-aware */
+        .stFormSubmitButton > button {
+            border-radius: 0.375rem !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        
+        .stFormSubmitButton > button:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        /* Dark theme form submit button overrides */
+        [data-theme="dark"] .stFormSubmitButton > button {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+        
+        [data-theme="dark"] .stFormSubmitButton > button:hover {
+            background-color: #0b5ed7 !important;
+            border-color: #0b5ed7 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Light theme form submit button overrides */
+        [data-theme="light"] .stFormSubmitButton > button {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+        
+        [data-theme="light"] .stFormSubmitButton > button:hover {
+            background-color: #0b5ed7 !important;
+            border-color: #0b5ed7 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Force white text for light theme form submit buttons with higher specificity */
+        body:not([data-theme="dark"]) .stFormSubmitButton > button {
+            color: #ffffff !important;
+        }
+        
+        html body:not([data-theme="dark"]) .stFormSubmitButton > button {
+            color: #ffffff !important;
+        }
+        
+        /* Maximum specificity for light theme form submit button text */
+        html body:not([data-theme="dark"]) .stFormSubmitButton > button,
+        html body:not([data-theme="dark"]) .stFormSubmitButton > button span,
+        html body:not([data-theme="dark"]) .stFormSubmitButton > button div,
+        html body:not([data-theme="dark"]) .stFormSubmitButton > button p {
+            color: #ffffff !important;
+        }
+        
+        /* Secondary button styling */
+        .stButton > button[kind="secondary"] {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #ffffff !important;
+        }
+        
+        .stButton > button[kind="secondary"]:hover {
+            background-color: #5a6268 !important;
+            border-color: #5a6268 !important;
+        }
+        
+        /* Label styling - Dark theme */
+        .stMarkdown, .stText, .stLabel {
+            color: #ffffff !important;
+        }
+        
+        /* Form text styling */
+        .form-text, .text-muted {
+            color: #aaaaaa !important;
+        }
+        
+        /* Ensure all text in sidebar is visible */
+        .css-1d391kg * {
+            color: #ffffff !important;
+        }
+        
+        /* Fix any remaining dark text on dark background */
+        [data-testid="stSidebar"] * {
+            color: #ffffff !important;
+        }
+        
+        /* Selectbox styling - Theme-aware */
+        .stSelectbox > div > div > div {
+            border: 1px solid #555555 !important;
+            border-radius: 0.375rem !important;
+        }
+        
+        .stSelectbox > div > div > div:hover {
+            border-color: #0d6efd !important;
+        }
+        
+        /* Selectbox dropdown options */
+        .stSelectbox [data-baseweb="select"] > div {
+            border: 1px solid #555555 !important;
+        }
+        
+        /* Selectbox dropdown list */
+        .stSelectbox [data-baseweb="popover"] {
+            border: 1px solid #555555 !important;
+        }
+        
+        /* Additional selectbox fixes for better consistency */
+        .stSelectbox label {
+            font-weight: 500 !important;
+        }
+        
+        /* Selectbox container */
+        .stSelectbox {
+            margin-bottom: 1rem !important;
+        }
+        
+        /* Fix for selectbox placeholder text */
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"]::placeholder {
+            color: #aaaaaa !important;
+        }
+        
+        /* Light theme overrides for selectbox text */
+        [data-theme="light"] .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        [data-theme="light"] .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] span,
+        [data-theme="light"] .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] div,
+        [data-theme="light"] .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] p {
+            color: #000000 !important;
+        }
+        
+        /* Light theme selectbox background */
+        [data-theme="light"] .stSelectbox [data-baseweb="select"] > div {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        
+        /* Light theme dropdown options */
+        [data-theme="light"] .stSelectbox [data-baseweb="popover"] {
+            background-color: #ffffff !important;
+        }
+        
+        [data-theme="light"] .stSelectbox [data-baseweb="popover"] li {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        
+        [data-theme="light"] .stSelectbox [data-baseweb="popover"] li:hover {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Force light theme text color for all selectbox elements */
+        [data-theme="light"] .stSelectbox * {
+            color: #000000 !important;
+        }
+        
+        /* Additional light theme overrides with different selectors */
+        .css-1d391kg .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        .css-18e3th9 .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        div[data-testid="block-container"] .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] {
+            color: #000000 !important;
+        }
+        
+        /* Force black text for light theme using body class */
+        body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] span,
+        body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] div,
+        body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] p {
+            color: #000000 !important;
+        }
+        
+        /* Override any theme.py selectbox styling */
+        .stSidebar .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        .stSidebar .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] span,
+        .stSidebar .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] div {
+            color: inherit !important;
+        }
+        
+        /* Maximum specificity overrides for light theme */
+        html body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        html body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] span,
+        html body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] div,
+        html body:not([data-theme="dark"]) .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] p {
+            color: #000000 !important;
+        }
+        
+        /* Override theme.py variables for selectbox */
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] {
+            color: var(--text-color, #000000) !important;
+        }
+        
+        /* Force light theme colors */
+        :root {
+            --selectbox-text-color: #000000;
+        }
+        
+        [data-theme="light"] {
+            --selectbox-text-color: #000000;
+        }
+        
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] {
+            color: var(--selectbox-text-color) !important;
+        }
+        
+        /* Streamlit alert compatibility - Dark theme */
+        .stAlert {
+            background-color: #0d1117 !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+        
+        .stAlert[data-baseweb="notification"] {
+            background-color: #0d1117 !important;
+            border-color: #ffc107 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Success box styling - Dark theme */
+        .stSuccess {
+            background-color: #0d1117 !important;
+            border-color: #198754 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Error box styling - Dark theme */
+        .stError {
+            background-color: #0d1117 !important;
+            border-color: #dc3545 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Warning box styling - Dark theme */
+        .stWarning {
+            background-color: #0d1117 !important;
+            border-color: #ffc107 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Sidebar visibility and styling */
+        section[data-testid="stSidebar"] {
+            background-color: #2b2b2b !important;
+            color: #ffffff !important;
+        }
+        
+        section[data-testid="stSidebar"] .css-1d391kg {
+            background-color: transparent !important;
+        }
+        
+        /* Ensure all sidebar content is visible */
+        section[data-testid="stSidebar"] * {
+            color: #ffffff !important;
+        }
+        
+        /* Simple text color fixes for dark theme */
+        .text-muted {
+            color: #aaaaaa !important;
+        }
+        
+        /* Fix sidebar text color */
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] label {
+            color: #ffffff !important;
+        }
+        
+        /* Remove extra horizontal line at top of sidebar */
+        section[data-testid="stSidebar"] > div:first-child {
+            border-top: none !important;
+            border-bottom: none !important;
+        }
+        
+        /* Remove borders from first few elements in sidebar */
+        section[data-testid="stSidebar"] > div:nth-child(1),
+        section[data-testid="stSidebar"] > div:nth-child(2),
+        section[data-testid="stSidebar"] > div:nth-child(3) {
+            border-top: none !important;
+            border-bottom: none !important;
+        }
+        
+        /* Remove any unwanted borders from sidebar elements */
+        section[data-testid="stSidebar"] .stMarkdown:first-child,
+        section[data-testid="stSidebar"] .stMarkdown:first-child h3 {
+            border-top: none !important;
+            border-bottom: none !important;
+        }
+        
+        /* Clean up sidebar section dividers */
+        section[data-testid="stSidebar"] .stMarkdown:has(h3) {
+            border-top: none !important;
+            padding-top: 0.5rem !important;
+            margin-top: 0.5rem !important;
+        }
+        
+        /* Fix expander headers in sidebar */
+        section[data-testid="stSidebar"] .streamlit-expanderHeader {
+            background-color: #3b3b3b !important;
+            color: #ffffff !important;
+            border: 1px solid #555555 !important;
+        }
+        
+        /* Fix expander headers in main content - More specific selectors */
+        .streamlit-expanderHeader,
+        [data-testid="stExpander"] .streamlit-expanderHeader,
+        .stExpander .streamlit-expanderHeader {
+            background-color: #3b3b3b !important;
+            color: #ffffff !important;
+            border: 1px solid #555555 !important;
+            border-radius: 0.375rem !important;
+            padding: 0.75rem 1rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        /* Expander content area */
+        .streamlit-expanderContent,
+        [data-testid="stExpander"] .streamlit-expanderContent,
+        .stExpander .streamlit-expanderContent {
+            background-color: #2b2b2b !important;
+            border: 1px solid #555555 !important;
+            border-top: none !important;
+            border-radius: 0 0 0.375rem 0.375rem !important;
+            padding: 1rem !important;
+        }
+        
+        /* Expander when collapsed */
+        .streamlit-expanderHeader[aria-expanded="false"],
+        [data-testid="stExpander"] .streamlit-expanderHeader[aria-expanded="false"] {
+            border-radius: 0.375rem !important;
+            border-bottom: 1px solid #555555 !important;
+        }
+        
+        /* Expander when expanded */
+        .streamlit-expanderHeader[aria-expanded="true"],
+        [data-testid="stExpander"] .streamlit-expanderHeader[aria-expanded="true"] {
+            border-radius: 0.375rem 0.375rem 0 0 !important;
+            border-bottom: none !important;
+        }
+        
+        /* Hover effect for expander headers */
+        .streamlit-expanderHeader:hover,
+        [data-testid="stExpander"] .streamlit-expanderHeader:hover {
+            background-color: #4b4b4b !important;
+            border-color: #0d6efd !important;
+            box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2) !important;
+        }
+        
+        /* Force expander styling with higher specificity */
+        div[data-testid="stExpander"] {
+            border: 1px solid #555555 !important;
+            border-radius: 0.375rem !important;
+            margin-bottom: 1rem !important;
+        }
+        
+        /* Override theme.py expander styling with maximum specificity */
+        body .streamlit-expanderHeader,
+        body [data-testid="stExpander"] .streamlit-expanderHeader,
+        body .stExpander .streamlit-expanderHeader,
+        html body .streamlit-expanderHeader {
+            background-color: #3b3b3b !important;
+            color: #ffffff !important;
+            border: 1px solid #555555 !important;
+            border-radius: 0.375rem !important;
+            padding: 0.75rem 1rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        /* Override theme.py expander content styling */
+        body .streamlit-expanderContent,
+        body [data-testid="stExpander"] .streamlit-expanderContent,
+        body .stExpander .streamlit-expanderContent,
+        html body .streamlit-expanderContent {
+            background-color: #2b2b2b !important;
+            border: 1px solid #555555 !important;
+            border-top: none !important;
+            border-radius: 0 0 0.375rem 0.375rem !important;
+            padding: 1rem !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 def render_header():
@@ -189,6 +735,15 @@ def render_sidebar():
         
         # Ollama Integration
         render_ollama_integration()
+        
+        # FAISS Database Dashboard
+        st.markdown("---")
+        try:
+            from components.faiss_dashboard import render_faiss_dashboard
+            render_faiss_dashboard()
+        except ImportError:
+            st.markdown("### 🗄️ FAISS Database")
+            st.info("FAISS dashboard component not available")
         
         # Connection Diagnostics & Debug Tools (Bottom of navbar)
         st.markdown("---")
