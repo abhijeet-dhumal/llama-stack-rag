@@ -345,7 +345,7 @@ def render_file_uploader() -> List:
     
     input_method = st.radio(
         "Choose input method:",
-        ["📄 Upload Files", "🌐 Web URLs"],
+        ["📄 Upload Files", "🌐 Single URL", "🚀 Bulk URLs"],
         key="input_method_radio",
         horizontal=True
     )
@@ -376,8 +376,8 @@ def render_file_uploader() -> List:
             - 📊 PowerPoint (.pptx)
             """)
     
-    elif input_method == "🌐 Web URLs":
-        st.info("🔗 Extract content from web pages in real-time")
+    elif input_method == "🌐 Single URL":
+        st.info("🔗 Extract content from a single web page in real-time")
         st.info("Uses MCP server with Mozilla Readability for clean content extraction")
         
         # URL processing form
@@ -410,6 +410,13 @@ def render_file_uploader() -> List:
             - ❌ Dynamic content (JavaScript-heavy)
             - ❌ Pages requiring authentication
             """)
+    
+    elif input_method == "🚀 Bulk URLs":
+        st.info("🚀 Process multiple URLs at once for efficient bulk content extraction")
+        st.info("Supports text input and file uploads (.txt, .csv)")
+        
+        # Call the bulk URL processing interface
+        render_bulk_url_input()
     
     return uploaded_files if uploaded_files else []
 
@@ -502,6 +509,307 @@ def process_web_url(url: str):
             
     except Exception as e:
         st.error(f"❌ Error processing URL: {str(e)}")
+
+
+def process_bulk_web_urls(urls: List[str], progress_callback=None):
+    """Process multiple web URLs in bulk and add to document storage"""
+    if not urls:
+        st.error("Please provide at least one URL")
+        return
+    
+    # Limit the number of URLs to prevent overwhelming the system
+    MAX_URLS = 50
+    if len(urls) > MAX_URLS:
+        st.warning(f"⚠️ Too many URLs ({len(urls)}). Processing first {MAX_URLS} URLs only.")
+        urls = urls[:MAX_URLS]
+    
+    # Clean and validate URLs
+    valid_urls = []
+    for url in urls:
+        url = url.strip()
+        if url and url.startswith(('http://', 'https://')):
+            valid_urls.append(url)
+        elif url:
+            # Try to add https if no protocol specified
+            if not url.startswith(('http://', 'https://')):
+                url = f"https://{url}"
+                valid_urls.append(url)
+    
+    if not valid_urls:
+        st.error("No valid URLs found. Please provide URLs starting with http:// or https://")
+        return
+    
+    # Initialize web content processor if not exists
+    if 'web_content_processor' not in st.session_state:
+        st.session_state.web_content_processor = WebContentProcessor()
+    
+    processor = st.session_state.web_content_processor
+    
+    # Initialize session state for uploaded documents
+    if 'uploaded_documents' not in st.session_state:
+        st.session_state.uploaded_documents = []
+    
+    # Track processing results
+    results = {
+        'successful': [],
+        'failed': [],
+        'duplicates': [],
+        'total_processed': 0
+    }
+    
+    # Create progress bar for bulk processing
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        for i, url in enumerate(valid_urls):
+            # Update progress
+            progress = (i + 1) / len(valid_urls)
+            progress_bar.progress(progress)
+            status_text.text(f"Processing {i + 1}/{len(valid_urls)}: {url}")
+            
+            try:
+                # Extract content from URL
+                result = processor.process_url(url)
+                
+                if result and result.get('success'):
+                    # Create a document-like structure for web content
+                    content = result.get('content', '')
+                    title = result.get('title', f"Web Content from {url}")
+                    
+                    # Get domain for display
+                    from urllib.parse import urlparse
+                    domain = urlparse(url).netloc
+                    
+                    # Check for duplicates before processing
+                    existing_web_docs = [doc for doc in st.session_state.uploaded_documents 
+                                       if doc.get('source_url') == url]
+                    
+                    if existing_web_docs:
+                        results['duplicates'].append({
+                            'url': url,
+                            'domain': domain,
+                            'reason': 'Already exists in documents'
+                        })
+                        continue
+                    
+                    web_document = {
+                        'name': f"{title}",
+                        'content': content,
+                        'file_type': 'WEB',
+                        'file_size_mb': len(content) / (1024 * 1024),
+                        'chunk_count': 0,  # Will be calculated during embedding
+                        'character_count': len(content),
+                        'upload_time': time.strftime("%Y-%m-%d %H:%M:%S"),
+                        'source_url': url,
+                        'domain': domain,
+                        'extraction_method': result.get('method', 'unknown'),
+                        'metadata': result.get('metadata', {}),
+                        'processed_at': result.get('processed_at', time.time())
+                    }
+                    
+                    # Create chunks using existing chunking logic
+                    chunks = create_chunks_from_content(content)
+                    web_document['chunk_count'] = len(chunks)
+                    
+                    # Create embeddings using existing embedding system
+                    embeddings_data = create_embeddings_from_chunks(chunks)
+                    
+                    if embeddings_data:
+                        web_document['chunks'] = chunks
+                        web_document['embeddings'] = embeddings_data
+                        
+                        # Add to uploaded documents
+                        st.session_state.uploaded_documents.append(web_document)
+                        
+                        results['successful'].append({
+                            'url': url,
+                            'domain': domain,
+                            'title': title,
+                            'chunks': len(chunks),
+                            'size_mb': web_document['file_size_mb']
+                        })
+                    else:
+                        results['failed'].append({
+                            'url': url,
+                            'domain': domain,
+                            'reason': 'Failed to create embeddings'
+                        })
+                else:
+                    results['failed'].append({
+                        'url': url,
+                        'domain': urlparse(url).netloc if 'urlparse' in locals() else 'unknown',
+                        'reason': 'Failed to extract content'
+                    })
+                
+                results['total_processed'] += 1
+                
+            except Exception as e:
+                results['failed'].append({
+                    'url': url,
+                    'domain': 'unknown',
+                    'reason': f'Error: {str(e)}'
+                })
+                results['total_processed'] += 1
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Display results summary
+        st.markdown("### 📊 Bulk Processing Results")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("✅ Successful", len(results['successful']))
+        with col2:
+            st.metric("❌ Failed", len(results['failed']))
+        with col3:
+            st.metric("🔄 Duplicates", len(results['duplicates']))
+        with col4:
+            st.metric("📊 Total Processed", results['total_processed'])
+        
+        # Show detailed results
+        if results['successful']:
+            st.markdown("#### ✅ Successfully Processed")
+            for item in results['successful']:
+                st.success(f"**{item['domain']}** - {item['title']} ({item['chunks']} chunks, {item['size_mb']:.2f} MB)")
+        
+        if results['failed']:
+            st.markdown("#### ❌ Failed to Process")
+            for item in results['failed']:
+                st.error(f"**{item['domain']}** - {item['reason']}")
+        
+        if results['duplicates']:
+            st.markdown("#### 🔄 Skipped (Already Exists)")
+            for item in results['duplicates']:
+                st.warning(f"**{item['domain']}** - {item['reason']}")
+        
+        # Show overall success message
+        if results['successful']:
+            total_chunks = sum(item['chunks'] for item in results['successful'])
+            total_size = sum(item['size_mb'] for item in results['successful'])
+            st.success(f"🎉 Successfully processed {len(results['successful'])} URLs with {total_chunks} total chunks ({total_size:.2f} MB)")
+        
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"❌ Error during bulk processing: {str(e)}")
+
+
+def render_bulk_url_input():
+    """Render the bulk URL input interface"""
+    st.markdown("### 🌐 Bulk Web Content Extraction")
+    st.markdown("Process multiple URLs at once. Enter one URL per line:")
+    
+    # Text area for bulk URLs
+    urls_text = st.text_area(
+        "Enter URLs (one per line):",
+        placeholder="https://example.com\nhttps://docs.example.com\nhttps://blog.example.com\nhttps://news.example.com",
+        height=150,
+        help="Enter multiple URLs, one per line. URLs should start with http:// or https://",
+        key="bulk_urls_text"
+    )
+    
+    # Quick example button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("📝 Load Example", help="Load sample URLs for testing"):
+            example_urls = """https://example.com
+https://docs.example.com
+https://blog.example.com
+https://news.example.com"""
+            st.session_state.bulk_urls_text = example_urls
+            st.rerun()
+    with col2:
+        st.caption("💡 Click to load example URLs for testing")
+    
+    # File upload option for bulk URLs
+    st.markdown("**Or upload a text file with URLs:**")
+    uploaded_file = st.file_uploader(
+        "Upload URL list file",
+        type=['txt', 'csv'],
+        help="Upload a text file with one URL per line, or a CSV file with URLs in the first column"
+    )
+    
+    # Process URLs from file if uploaded
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                # Handle CSV file
+                df = pd.read_csv(uploaded_file)
+                if len(df.columns) > 0:
+                    urls_from_file = df.iloc[:, 0].dropna().astype(str).tolist()
+                else:
+                    st.error("❌ CSV file appears to be empty")
+                    return
+            else:
+                # Handle text file
+                content = uploaded_file.read().decode('utf-8')
+                urls_from_file = [line.strip() for line in content.split('\n') if line.strip()]
+            
+            if urls_from_file:
+                st.success(f"📄 Loaded {len(urls_from_file)} URLs from file")
+                st.markdown("**URLs from file:**")
+                for url in urls_from_file[:10]:  # Show first 10
+                    st.code(url)
+                if len(urls_from_file) > 10:
+                    st.caption(f"... and {len(urls_from_file) - 10} more URLs")
+                
+                # Combine with manually entered URLs
+                manual_urls = [url.strip() for url in urls_text.split('\n') if url.strip()] if urls_text else []
+                all_urls = manual_urls + urls_from_file
+                
+                if st.button("🚀 Process All URLs", type="primary"):
+                    if all_urls:
+                        process_bulk_web_urls(all_urls)
+                    else:
+                        st.warning("⚠️ No URLs to process")
+            else:
+                st.error("❌ No valid URLs found in the uploaded file")
+        
+        except Exception as e:
+            st.error(f"❌ Error reading file: {str(e)}")
+    
+    else:
+        # Process manually entered URLs
+        if urls_text:
+            urls = [url.strip() for url in urls_text.split('\n') if url.strip()]
+            
+            if urls:
+                st.markdown(f"**Found {len(urls)} URLs to process:**")
+                for url in urls[:5]:  # Show first 5
+                    st.code(url)
+                if len(urls) > 5:
+                    st.caption(f"... and {len(urls) - 5} more URLs")
+                
+                if st.button("🚀 Process URLs", type="primary"):
+                    process_bulk_web_urls(urls)
+            else:
+                st.warning("⚠️ No valid URLs found in the text area")
+        else:
+            st.info("💡 Enter URLs in the text area above or upload a file with URLs")
+    
+    # Show processing tips
+    with st.expander("💡 Processing Tips"):
+        st.markdown("""
+        **Best Practices for Bulk URL Processing:**
+        
+        - **URL Format**: Ensure URLs start with `http://` or `https://`
+        - **File Size**: Large files may take longer to process
+        - **Rate Limiting**: Some websites may limit requests
+        - **Content Quality**: Not all websites provide extractable content
+        
+        **Supported File Formats:**
+        - **Text files (.txt)**: One URL per line
+        - **CSV files (.csv)**: URLs in the first column
+        
+        **Processing Limits:**
+        - Maximum 50 URLs per batch (to avoid overwhelming the system)
+        - Each URL is processed sequentially for stability
+        - Duplicate URLs are automatically skipped
+        - Processing time depends on website response times
+        """)
 
 
 def create_chunks_from_content(content: str) -> List[str]:
