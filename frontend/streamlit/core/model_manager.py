@@ -249,7 +249,7 @@ def remove_ollama_model(model_name: str) -> None:
 
 
 def get_all_available_models() -> Dict[str, List[Any]]:
-    """Get models from both Ollama and LlamaStack - embedding model is fixed to all-MiniLM-L6-v2"""
+    """Get models from Ollama only - embedding model is fixed to all-MiniLM-L6-v2"""
     embedding_models = []
     llm_models = []
     all_models = []
@@ -270,7 +270,7 @@ def get_all_available_models() -> Dict[str, List[Any]]:
     # Ensure session state uses the fixed embedding model
     st.session_state.selected_embedding_model = "all-MiniLM-L6-v2"
     
-    # 1. Get LLM models from Ollama directly  
+    # Get LLM models from Ollama directly only
     ollama_status = check_ollama_status()
     debug_info.append(f"Ollama Status: {'Running' if ollama_status['running'] else 'Not Running'}")
     
@@ -279,7 +279,7 @@ def get_all_available_models() -> Dict[str, List[Any]]:
         for model in ollama_status["models"]:
             model_name = model["name"]
             # Only add LLM models, skip embedding models
-            if "embed" not in model_name.lower():
+            if "embed" not in model_name.lower() and "nomic" not in model_name.lower():
                 model_info = {
                     "identifier": model_name,
                     "name": model_name,
@@ -291,31 +291,7 @@ def get_all_available_models() -> Dict[str, List[Any]]:
     else:
         debug_info.append("No Ollama models found")
     
-    # 2. Get LLM models from LlamaStack (if available)
-    try:
-        llamastack_models = st.session_state.llamastack_client.get_available_models()
-        debug_info.append(f"LlamaStack Models: {len(llamastack_models.get('all', []))}")
-        
-        # Add LlamaStack LLM models that aren't already from Ollama
-        for model in llamastack_models.get("llm", []):
-            model_name = model.get("identifier", model.get("name", "unknown"))
-            
-            # Check if we already have this model from Ollama
-            if not any(m["identifier"] == model_name for m in llm_models):
-                model_info = {
-                    "identifier": model_name,
-                    "name": model_name,
-                    "source": "LlamaStack"
-                }
-                llm_models.append(model_info)
-                all_models.append(model_info)
-                debug_info.append(f"Added LLM model from LlamaStack: {model_name}")
-    
-    except Exception as e:
-        debug_info.append(f"LlamaStack Error: {str(e)}")
-        print(f"Error getting LlamaStack models: {e}")
-    
-    # 3. Add default LLM model if none found
+    # Add default LLM model if none found
     if not llm_models:
         default_llm = {"identifier": "llama3.2:1b", "name": "llama3.2:1b", "source": "Default"}
         llm_models.append(default_llm)

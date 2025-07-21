@@ -14,7 +14,7 @@ class LlamaStackClient:
         self.base_url = base_url
         self.session = requests.Session()
         self.ollama_url = "http://localhost:11434"
-        
+    
     def health_check(self) -> bool:
         """Check if LlamaStack is responding"""
         try:
@@ -45,7 +45,7 @@ class LlamaStackClient:
                         embedding_models.append(model_info)
                     elif model.get("model_type") == "llm":
                         llm_models.append(model_info)
-                
+                        
                 # Add local Ollama LLM models (but not embeddings)
                 ollama_llm_models = self._get_ollama_llm_models()
                 llm_models.extend(ollama_llm_models)
@@ -60,7 +60,7 @@ class LlamaStackClient:
         except Exception as e:
             print(f"Error getting models: {e}")
         
-        return self._get_default_models()
+            return self._get_default_models()
     
     def _get_ollama_llm_models(self) -> List[Dict[str, str]]:
         """Get LLM models from Ollama directly (no embeddings)"""
@@ -98,7 +98,7 @@ class LlamaStackClient:
             "llm": [default_llm],
             "all": [default_embedding, default_llm]
         }
-
+    
     def get_embeddings(self, text: str, model: str = "all-MiniLM-L6-v2") -> Optional[List[float]]:
         """Get embeddings using LlamaStack inference/embeddings endpoint with sentence-transformers"""
         try:
@@ -118,7 +118,7 @@ class LlamaStackClient:
                         return embedding
             else:
                 print(f"LlamaStack embeddings failed with status {response.status_code}: {response.text}")
-                
+            
         except Exception as e:
             print(f"Error getting embeddings from LlamaStack: {e}")
         
@@ -145,7 +145,7 @@ class LlamaStackClient:
         
         print(f"⚠️ Using dummy embedding for: {text[:50]}...")
         return dummy_embedding
-
+    
     def chat_completion(self, user_prompt: str, system_prompt: str = "", model: str = "llama3.2:1b") -> str:
         """Generate chat completion with improved error handling and fallbacks"""
         try:
@@ -229,48 +229,37 @@ class LlamaStackClient:
                                 print(f"✅ LlamaStack success via {config['url']}")
                                 return content.strip()
                         
-                        # Handle OpenAI compatible response format
+                        # Handle OpenAI-compatible format
                         elif "choices" in data and len(data["choices"]) > 0:
-                            content = data["choices"][0]["message"]["content"]
+                            content = data["choices"][0].get("message", {}).get("content", "")
                             if content and len(content.strip()) > 10:
                                 print(f"✅ LlamaStack success via {config['url']}")
                                 return content.strip()
                         
-                        # Handle plain response
-                        elif "response" in data:
-                            content = data["response"]
-                            if content and len(content.strip()) > 10:
-                                print(f"✅ LlamaStack success via {config['url']}")
-                                return content.strip()
+                        # Handle simple text response
+                        elif isinstance(data, str) and len(data.strip()) > 10:
+                            print(f"✅ LlamaStack success via {config['url']}")
+                            return data.strip()
                         
-                        print(f"⚠️ LlamaStack returned unexpected format via {config['url']}: {data}")
-                    
-                    elif response.status_code == 404:
-                        print(f"❌ Endpoint not found: {config['url']}")
-                        continue
-                    elif response.status_code == 400:
-                        print(f"❌ Bad request to {config['url']}: {response.text}")
-                        continue
-                    else:
-                        print(f"❌ LlamaStack error {response.status_code} via {config['url']}: {response.text}")
-                        continue
-                        
+                        else:
+                            print(f"⚠️ Unexpected response format from {config['url']}")
+                            
                 except Exception as e:
-                    print(f"❌ Error with endpoint {config['url']}: {e}")
+                    print(f"❌ Error with {config['url']}: {str(e)}")
                     continue
             
-            print(f"⚠️ All LlamaStack endpoints failed, trying Ollama fallback")
+            # If all LlamaStack endpoints failed, try Ollama directly
+            print("🔄 All LlamaStack endpoints failed, trying Ollama directly...")
+            ollama_result = self._try_ollama_direct(user_prompt, system_prompt, model)
+            if ollama_result:
+                return ollama_result
             
-            # Try Ollama fallback before giving up
-            ollama_response = self._try_ollama_direct(user_prompt, system_prompt, model)
-            if ollama_response:
-                return ollama_response
-            
-            # Return context-aware fallback if API fails
+            # Final fallback
+            print("⚠️ All LLM attempts failed, using context-aware fallback")
             return self._generate_context_aware_fallback(user_prompt, system_prompt)
             
         except Exception as e:
-            print(f"❌ Chat completion error: {e}")
+            print(f"❌ Chat completion error: {str(e)}")
             return self._generate_context_aware_fallback(user_prompt, system_prompt)
     
     def _try_ollama_direct(self, user_prompt: str, system_prompt: str, model: str) -> str:

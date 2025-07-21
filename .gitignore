@@ -29,6 +29,10 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Application Cache
+.cache/
+cache/
+
 # Environment Variables
 .env
 .env.local
@@ -113,6 +117,7 @@ data/cache/*
 *.index
 *.ann
 *.hnsw
+*.db
 chroma/
 pinecone/
 weaviate/

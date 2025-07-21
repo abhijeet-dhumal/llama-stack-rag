@@ -7,7 +7,7 @@ import streamlit as st
 import time
 import pandas as pd
 from typing import List, Dict, Any
-from .utils import format_file_size
+from .utils import format_file_size, mark_upload_start, mark_upload_success, mark_upload_failed
 from .web_content_processor import WebContentProcessor
 
 
@@ -326,7 +326,6 @@ def initialize_document_storage() -> None:
 
 def render_file_uploader() -> List:
     """Render file upload interface with status indicators and URL input"""
-    st.markdown("### 📁 Add Content Sources")
     
     # Show current upload status
     if hasattr(st.session_state, 'currently_uploading') and st.session_state.currently_uploading:
@@ -341,12 +340,21 @@ def render_file_uploader() -> List:
             st.session_state.failed_uploads.clear()
             st.rerun()
     
-    # Create tabs for different input methods
-    file_tab, url_tab = st.tabs(["📄 Upload Files", "🌐 Web URLs"])
+    # Create input method selector with radio buttons for better state preservation
+    # Initialize input method state
+    if 'input_method' not in st.session_state:
+        st.session_state.input_method = "📄 Upload Files"
+    
+    input_method = st.radio(
+        "Choose input method:",
+        ["📄 Upload Files", "🌐 Web URLs"],
+        key="input_method_radio",
+        horizontal=True
+    )
     
     uploaded_files = []
     
-    with file_tab:
+    if input_method == "📄 Upload Files":
         # File uploader widget
         uploaded_files = st.file_uploader(
             "Choose files to upload",
@@ -371,18 +379,22 @@ def render_file_uploader() -> List:
             - 📊 PowerPoint (.pptx)
             """)
     
-    with url_tab:
+    elif input_method == "🌐 Web URLs":
         st.markdown("🔗 **Extract content from web pages in real-time**")
         st.markdown("*Uses MCP server with Mozilla Readability for clean content extraction*")
         
-        url = st.text_input(
-            "Enter URL:",
-            placeholder="https://example.com/article",
-            help="Enter a web URL to extract and process its content"
-        )
-        
-        if url and st.button("🌐 Process URL", type="primary"):
-            process_web_url(url)
+        # Use a form for better UX and to prevent tab switching
+        with st.form("web_url_form"):
+            url = st.text_input(
+                "Enter URL:",
+                placeholder="https://example.com/article",
+                help="Enter a web URL to extract and process its content"
+            )
+            
+            submitted = st.form_submit_button("🌐 Process URL", type="primary")
+            
+            if submitted and url:
+                process_web_url(url)
         
         # Show URL processing tips
         with st.expander("💡 URL Processing Tips", expanded=False):
@@ -463,6 +475,14 @@ def process_web_url(url: str):
                     if 'uploaded_documents' not in st.session_state:
                         st.session_state.uploaded_documents = []
                     
+                    # Check for duplicates before adding
+                    existing_web_docs = [doc for doc in st.session_state.uploaded_documents 
+                                       if doc.get('source_url') == url]
+                    
+                    if existing_web_docs:
+                        st.warning(f"⚠️ Content from '{domain}' already exists in your documents")
+                        return
+                    
                     st.session_state.uploaded_documents.append(web_document)
                     
                     # Show success message
@@ -477,7 +497,7 @@ def process_web_url(url: str):
                     with col3:
                         st.metric("📊 Size", f"{web_document['file_size_mb']:.2f} MB")
                     
-                    st.rerun()
+                    # Form will automatically clear the input on successful submission
                 else:
                     st.error("❌ Failed to create embeddings for web content")
         else:
@@ -590,7 +610,7 @@ def process_uploaded_files(files: List[Any]) -> int:
         if file_size_mb > 5:
             estimated_time = file_size_mb * 15  # Rough estimate: 15 seconds per MB
             st.info(f"⏱️ Large file detected. Estimated processing time: ~{estimated_time:.0f} seconds")
-        
+    
         # Add interruption warning
         st.warning("⚠️ **Don't switch models during upload** - this will interrupt processing")
         
@@ -697,10 +717,22 @@ def process_uploaded_files(files: List[Any]) -> int:
                     'file_size_mb': actual_size_mb
                 }
                 
-                # Store in both formats for compatibility
-                st.session_state.documents.append(doc_data)
+                # Check for duplicates before adding
                 if 'uploaded_documents' not in st.session_state:
                     st.session_state.uploaded_documents = []
+                
+                # Check if document with same name and size already exists
+                file_id = f"{file.name}_{file.size}"
+                existing_docs = [doc for doc in st.session_state.uploaded_documents 
+                               if doc.get('name') == file.name and 
+                               doc.get('file_size_mb', 0) == actual_size_mb]
+                
+                if existing_docs:
+                    st.warning(f"⚠️ File '{file.name}' already exists in your documents")
+                    mark_upload_success(file_id)  # Mark as processed to avoid retry
+                    continue
+                
+                # Add to documents array (only one array to avoid duplication)
                 st.session_state.uploaded_documents.append(doc_data)
                 
                 # Final progress
@@ -729,14 +761,8 @@ def process_uploaded_files(files: List[Any]) -> int:
                 
             except Exception as e:
                 st.error(f"❌ Error processing {file.name}: {str(e)}")
-                print(f"Processing error for {file.name}: {e}")
                 mark_upload_failed(file_id)
-                continue
-            
-            finally:
-                # Clear progress indicators after a moment
-                time.sleep(1)
-                progress_container.empty()
+                st.info("💡 Check file format and try again")
     
     return successful_files
 
@@ -746,22 +772,28 @@ def render_document_library() -> None:
     # Try to restore data first in case it was lost
     restore_documents_data()
     
+    # Get total document count from both collections
+    doc_count = get_document_count()
+    
     # Debug: Check document state at render time
-    doc_count = len(st.session_state.uploaded_documents) if 'uploaded_documents' in st.session_state and st.session_state.uploaded_documents else 0
-    if doc_count == 0 and 'uploaded_documents' in st.session_state:
-        print(f"⚠️ Document library render: uploaded_documents is empty but exists in session state")
-    elif doc_count > 0:
+    if doc_count == 0:
+        print(f"⚠️ Document library render: no documents found in either collection")
+    else:
         print(f"✅ Document library render: found {doc_count} documents")
     
     st.markdown("---")
     
-    # Ensure session state exists
+    # Ensure session state exists for both collections
+    if 'documents' not in st.session_state:
+        st.session_state.documents = []
     if 'uploaded_documents' not in st.session_state:
         st.session_state.uploaded_documents = []
-        print("🔧 Fixed missing uploaded_documents in session state")
+    
+    # Use only uploaded_documents to avoid duplication
+    all_documents = st.session_state.uploaded_documents
     
     # Count documents for the header
-    total_size_mb = sum(doc.get("file_size_mb", 0) for doc in st.session_state.uploaded_documents) if st.session_state.uploaded_documents else 0
+    total_size_mb = sum(doc.get("file_size_mb", 0) for doc in all_documents) if all_documents else 0
     
     # Create collapsible expander with document count
     header_text = f"📁 Your Documents ({doc_count})"
@@ -769,17 +801,17 @@ def render_document_library() -> None:
         header_text += f" • {total_size_mb:.1f}MB"
     
     with st.expander(header_text, expanded=doc_count > 0):  # Auto-expand when documents exist
-        if st.session_state.uploaded_documents and doc_count > 0:
+        if all_documents and doc_count > 0:
             # Show document summary
-            total_chunks = sum(doc.get("chunk_count", 0) for doc in st.session_state.uploaded_documents)
-            total_chars = sum(len(doc.get("content", "")) for doc in st.session_state.uploaded_documents)
+            total_chunks = sum(doc.get("chunk_count", 0) for doc in all_documents)
+            total_chars = sum(len(doc.get("content", "")) for doc in all_documents)
             
             # Quick stats bar (always visible)
             st.info(f"📊 **{doc_count}** documents • **{total_size_mb:.1f}MB** total • **{total_chunks}** chunks")
             
             # Embedding Quality Summary
-            real_embeddings = sum(doc.get('chunk_count', 0) - doc.get('embedding_errors', 0) for doc in st.session_state.uploaded_documents)
-            total_embeddings = sum(doc.get('chunk_count', 0) for doc in st.session_state.uploaded_documents)
+            real_embeddings = sum(doc.get('chunk_count', 0) - doc.get('embedding_errors', 0) for doc in all_documents)
+            total_embeddings = sum(doc.get('chunk_count', 0) for doc in all_documents)
             embedding_quality = (real_embeddings / total_embeddings * 100) if total_embeddings > 0 else 0
             
             if embedding_quality > 80:
@@ -799,7 +831,7 @@ def render_document_library() -> None:
                 # Calculate additional metrics
                 avg_chunk_size = total_chars // total_chunks if total_chunks > 0 else 0
                 avg_file_size = total_size_mb / doc_count if doc_count > 0 else 0
-                total_processing_time = sum(doc.get('processing_time', 0) for doc in st.session_state.uploaded_documents)
+                total_processing_time = sum(doc.get('processing_time', 0) for doc in all_documents)
                 avg_processing_speed = total_size_mb / total_processing_time if total_processing_time > 0 else 0
                 
                 # Create comprehensive performance table
@@ -832,7 +864,7 @@ def render_document_library() -> None:
                         f"{avg_chunk_size:,} characters",
                         f"{avg_file_size:.2f} MB",
                         f"{total_chunks // doc_count if doc_count > 0 else 0:,}",
-                        f"{(doc_count / len(st.session_state.uploaded_documents) * 100):.1f}%" if st.session_state.uploaded_documents else "N/A",
+                        f"{(doc_count / len(all_documents) * 100):.1f}%" if all_documents else "N/A",
                         f"{total_chars // doc_count:,}" if doc_count > 0 else "N/A",
                         "🟢 Ready for Q&A and Search"
                     ],
@@ -867,12 +899,12 @@ def render_document_library() -> None:
                 )
                 
                 # Individual document breakdown
-                if len(st.session_state.uploaded_documents) > 1:
+                if len(all_documents) > 1:
                     st.markdown("---")
                     st.markdown("**📄 Individual Document Performance**")
                     
                     doc_performance = []
-                    for doc in st.session_state.uploaded_documents:
+                    for doc in all_documents:
                         chunk_count = doc.get('chunk_count', 0)
                         embedding_errors = doc.get('embedding_errors', 0)
                         doc_quality = ((chunk_count - embedding_errors) / chunk_count * 100) if chunk_count > 0 else 0
@@ -902,7 +934,7 @@ def render_document_library() -> None:
                     st.rerun()
             
             # Documents list
-            for idx, doc in enumerate(st.session_state.uploaded_documents):
+            for idx, doc in enumerate(all_documents):
                 # Handle different source types for display
                 if doc.get('file_type') == 'WEB':
                     doc_icon = "🌐"
@@ -962,7 +994,7 @@ def clear_all_documents() -> None:
     st.session_state.uploaded_documents = []
     st.session_state.documents = []  # Also clear old documents for chat
     st.session_state.chat_history = []  # Clear chat history too
-    
+
     # Clear backup as well
     if '_backup_uploaded_documents' in st.session_state:
         st.session_state['_backup_uploaded_documents'] = []
@@ -973,35 +1005,49 @@ def clear_all_documents() -> None:
 
 
 def remove_document(idx: int) -> None:
-    """Remove a specific document by index"""
-    # Remove from new uploaded_documents
-    removed_doc = st.session_state.uploaded_documents.pop(idx)
+    """Remove a specific document by index from the combined document list"""
+    # Get the combined document list
+    all_documents = st.session_state.documents + st.session_state.uploaded_documents
     
-    # Also remove from old documents structure by name
-    st.session_state.documents = [
-        d for d in st.session_state.documents 
-        if d['name'] != removed_doc['name']
-    ]
+    if idx >= len(all_documents):
+        print(f"❌ Invalid document index: {idx}")
+        return
+    
+    # Get the document to remove
+    doc_to_remove = all_documents[idx]
+    doc_name = doc_to_remove['name']
+    
+    # Remove from appropriate collection
+    if doc_to_remove in st.session_state.documents:
+        st.session_state.documents.remove(doc_to_remove)
+        print(f"🗑️ Removed document from 'documents': {doc_name}")
+    elif doc_to_remove in st.session_state.uploaded_documents:
+        st.session_state.uploaded_documents.remove(doc_to_remove)
+        print(f"🗑️ Removed document from 'uploaded_documents': {doc_name}")
     
     # Update backup
     backup_documents_data()
     
-    print(f"🗑️ Removed document: {removed_doc['name']}")
+    print(f"🗑️ Removed document: {doc_name}")
 
 
 def has_documents() -> bool:
     """Check if any documents are uploaded"""
-    return len(st.session_state.uploaded_documents) > 0
+    if 'uploaded_documents' in st.session_state:
+        return len(st.session_state.uploaded_documents) > 0
+    return False
 
 
 def get_document_count() -> int:
     """Get the total number of uploaded documents"""
-    return len(st.session_state.uploaded_documents) 
+    if 'uploaded_documents' in st.session_state:
+        return len(st.session_state.uploaded_documents)
+    return 0
 
 
 def try_basic_extraction(uploaded_file, file_extension: str) -> str:
     """Simplified extraction - recommend docling for all complex formats"""
-        return f"""Content from {uploaded_file.name} ({file_extension.upper()} format)
+    return f"""Content from {uploaded_file.name} ({file_extension.upper()} format)
 
 📋 To extract content from this file, install docling:
    pip install docling[all]
@@ -1102,20 +1148,20 @@ def create_text_chunks(text: str, chunk_size: int = None, overlap: int = None) -
             if para_break > start + chunk_size // 3:  # Must be at least 1/3 into chunk
                 end = para_break + 2
             else:
-            # Look for sentence boundary (. ! ?)
-            sentence_break = max(
-                text.rfind('. ', start, end),
-                text.rfind('! ', start, end),
-                text.rfind('? ', start, end)
-            )
-            
+                # Look for sentence boundary (. ! ?)
+                sentence_break = max(
+                    text.rfind('. ', start, end),
+                    text.rfind('! ', start, end),
+                    text.rfind('? ', start, end)
+                )
+                
                 if sentence_break > start + chunk_size // 2:  # Must be at least halfway
-                end = sentence_break + 1
-            else:
+                    end = sentence_break + 1
+                else:
                     # Look for word boundary as last resort
-                word_break = text.rfind(' ', start, end)
-                if word_break > start + chunk_size // 2:
-                    end = word_break
+                    word_break = text.rfind(' ', start, end)
+                    if word_break > start + chunk_size // 2:
+                        end = word_break
         
         # Extract chunk
         chunk = text[start:end].strip()

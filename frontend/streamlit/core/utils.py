@@ -4,7 +4,8 @@ Common helper functions used across modules
 """
 
 import streamlit as st
-from typing import List, Dict, Any
+import numpy as np
+from typing import List, Dict, Any, Union
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -145,29 +146,57 @@ def get_context_type(content: str) -> str:
         return "a technical or academic document"
 
 
-def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+def cosine_similarity(vec1: Union[List[float], np.ndarray], vec2: Union[List[float], np.ndarray]) -> float:
     """Calculate cosine similarity between two vectors and normalize to 0-1 range for relevance"""
-    if not vec1 or not vec2 or len(vec1) != len(vec2):
+    try:
+        # Convert numpy arrays to lists to avoid ambiguity issues
+        if isinstance(vec1, np.ndarray):
+            vec1 = vec1.tolist()
+        if isinstance(vec2, np.ndarray):
+            vec2 = vec2.tolist()
+        
+        # Debug logging
+        print(f"🔍 DEBUG: cosine_similarity called with vec1 length: {len(vec1)}, vec2 length: {len(vec2)}")
+        print(f"🔍 DEBUG: vec1 type: {type(vec1)}, vec2 type: {type(vec2)}")
+        
+        if not vec1 or not vec2 or len(vec1) != len(vec2):
+            print(f"❌ DEBUG: Invalid vectors - vec1: {bool(vec1)}, vec2: {bool(vec2)}, lengths: {len(vec1) if vec1 else 0} vs {len(vec2) if vec2 else 0}")
+            return 0.0
+        
+        # Check if vectors contain numpy arrays or other non-scalar values
+        if any(isinstance(x, (list, tuple)) for x in vec1) or any(isinstance(x, (list, tuple)) for x in vec2):
+            print(f"❌ DEBUG: Vectors contain non-scalar values - vec1: {[type(x) for x in vec1[:3]]}, vec2: {[type(x) for x in vec2[:3]]}")
+            return 0.0
+        
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        magnitude1 = sum(a * a for a in vec1) ** 0.5
+        magnitude2 = sum(b * b for b in vec2) ** 0.5
+        
+        print(f"🔍 DEBUG: dot_product: {dot_product}, magnitude1: {magnitude1}, magnitude2: {magnitude2}")
+        
+        if magnitude1 == 0 or magnitude2 == 0:
+            print(f"❌ DEBUG: Zero magnitude detected - magnitude1: {magnitude1}, magnitude2: {magnitude2}")
+            return 0.0
+        
+        # Calculate cosine similarity (-1 to 1)
+        cosine_sim = dot_product / (magnitude1 * magnitude2)
+        
+        # Normalize to 0-1 range for relevance percentage
+        # Convert from [-1, 1] to [0, 1] where:
+        # -1 (opposite) -> 0% relevance
+        # 0 (orthogonal) -> 50% relevance  
+        # 1 (identical) -> 100% relevance
+        relevance_score = (cosine_sim + 1) / 2
+        
+        result = max(0.0, min(1.0, relevance_score))
+        print(f"🔍 DEBUG: cosine_similarity result: {result:.4f}")
+        return result
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in cosine_similarity: {e}")
+        print(f"❌ DEBUG: vec1 sample: {vec1[:3] if vec1 else 'None'}")
+        print(f"❌ DEBUG: vec2 sample: {vec2[:3] if vec2 else 'None'}")
         return 0.0
-    
-    dot_product = sum(a * b for a, b in zip(vec1, vec2))
-    magnitude1 = sum(a * a for a in vec1) ** 0.5
-    magnitude2 = sum(b * b for b in vec2) ** 0.5
-    
-    if magnitude1 == 0 or magnitude2 == 0:
-        return 0.0
-    
-    # Calculate cosine similarity (-1 to 1)
-    cosine_sim = dot_product / (magnitude1 * magnitude2)
-    
-    # Normalize to 0-1 range for relevance percentage
-    # Convert from [-1, 1] to [0, 1] where:
-    # -1 (opposite) -> 0% relevance
-    # 0 (orthogonal) -> 50% relevance  
-    # 1 (identical) -> 100% relevance
-    relevance_score = (cosine_sim + 1) / 2
-    
-    return max(0.0, min(1.0, relevance_score))
 
 
 def validate_llamastack_connection() -> bool:

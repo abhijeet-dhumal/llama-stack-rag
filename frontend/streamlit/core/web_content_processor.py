@@ -58,10 +58,10 @@ class WebContentProcessor:
             # Try to use npx to run the MCP server
             cmd = [
                 'npx', '@just-every/mcp-read-website-fast',
-                'read-website',
-                '--url', url,
-                '--format', 'markdown',
-                '--timeout', str(self.timeout)
+                'fetch',
+                url,
+                '--output', 'markdown',
+                '--timeout', str(self.timeout * 1000)  # Convert to milliseconds
             ]
             
             with st.spinner(f"🌐 Extracting content from {url} using MCP server..."):

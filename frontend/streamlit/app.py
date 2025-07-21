@@ -89,24 +89,6 @@ def render_header():
     with col1:
         st.title("🦙 RAG LlamaStack")
         st.caption("Retrieval-Augmented Generation with LlamaStack & Ollama")
-    
-    with col2:
-        # Feature highlight badge
-        st.markdown("""
-        <div style="
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 20px;
-            text-align: center;
-            font-size: 0.8rem;
-            font-weight: bold;
-            margin-top: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">
-        🌐 NEW: Web URLs
-        </div>
-        """, unsafe_allow_html=True)
 
 
 def render_sidebar():
@@ -161,10 +143,6 @@ def render_sidebar():
         
         # Enhanced Content Sources Section with highlighting
         st.markdown("### 📁 Content Sources")
-        
-        # Add a feature highlight for web content processing
-        if not has_documents():
-            st.info("🌟 **NEW:** Process web URLs in addition to file uploads!")
         
         # Document Upload & Web URL Section
         uploaded_files = render_file_uploader()

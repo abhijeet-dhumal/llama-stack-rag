@@ -16,7 +16,7 @@
   "author": "RAG LlamaStack",
   "license": "MIT",
   "dependencies": {
-    "@just-every/mcp-read-website-fast": "^1.0.0"
+    "@just-every/mcp-read-website-fast": "^0.1.13"
   },
   "engines": {
     "node": ">=16.0.0"

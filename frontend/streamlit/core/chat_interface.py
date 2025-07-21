@@ -236,7 +236,9 @@ def render_chat_interface() -> None:
 
 
 def process_user_query(query: str) -> None:
-    """Process user query and generate response with improved reliability"""
+    """Process user query and generate response with enhanced error handling"""
+    print(f"🔍 DEBUG: Processing query: '{query}'")
+    
     # Add user message to chat history immediately
     st.session_state.chat_history.append({
         'role': 'user',
@@ -247,11 +249,22 @@ def process_user_query(query: str) -> None:
     embedding_model = "all-MiniLM-L6-v2"  # Fixed embedding model
     llm_model = st.session_state.selected_llm_model
     
+    print(f"🔍 DEBUG: Using models - embedding: {embedding_model}, llm: {llm_model}")
+    
     # Check if we have documents to search
-    if not st.session_state.documents:
+    total_documents = 0
+    if 'documents' in st.session_state:
+        total_documents += len(st.session_state.documents)
+    if 'uploaded_documents' in st.session_state:
+        total_documents += len(st.session_state.uploaded_documents)
+    
+    print(f"🔍 DEBUG: Total documents available: {total_documents}")
+    
+    if total_documents == 0:
+        print("❌ DEBUG: No documents available for search")
         st.session_state.chat_history.append({
             'role': 'assistant',
-            'content': "I don't have any documents to search. Please upload some documents first using the sidebar.",
+            'content': "I don't have any documents to search. Please upload some documents or process web URLs first using the sidebar.",
             'models_used': {
                 'embedding': embedding_model,
                 'llm': llm_model,
@@ -263,8 +276,12 @@ def process_user_query(query: str) -> None:
     try:
         # Show processing status briefly
         with st.spinner("🔍 Searching documents..."):
+            print("🔍 DEBUG: Getting embeddings for query...")
+            
             # Get embeddings for the query
             query_embedding = st.session_state.llamastack_client.get_embeddings(query, model=embedding_model)
+            
+            print(f"🔍 DEBUG: Query embedding received - length: {len(query_embedding) if query_embedding else 0}")
             
             # Check if we got real embeddings (not dummy ones)
             is_real_embedding = (
@@ -273,13 +290,23 @@ def process_user_query(query: str) -> None:
                 not all(abs(x) < 0.2 for x in query_embedding[:10])  # More reliable check
             )
             
+            print(f"🔍 DEBUG: Is real embedding: {is_real_embedding}")
+            
             if query_embedding:
+                print("🔍 DEBUG: Finding relevant chunks...")
+                
                 # Find relevant chunks
                 relevant_chunks = find_relevant_chunks(query_embedding)
                 
+                print(f"🔍 DEBUG: Found {len(relevant_chunks)} relevant chunks")
+                
                 if relevant_chunks:
+                    print("🔍 DEBUG: Generating response...")
+                    
                     # Generate response using improved method
                     response = generate_improved_response(query, relevant_chunks, llm_model, embedding_model)
+                    
+                    print(f"🔍 DEBUG: Response generated successfully")
                     
                     # Extract sources with embedding status info (using enhanced count)
                     from .config import TOP_SOURCES_COUNT
@@ -308,6 +335,8 @@ def process_user_query(query: str) -> None:
                     
                     st.session_state.chat_history.append(assistant_response)
                 else:
+                    print("❌ DEBUG: No relevant chunks found")
+                    
                     # No relevant chunks found
                     st.session_state.chat_history.append({
                         'role': 'assistant',
@@ -319,6 +348,8 @@ def process_user_query(query: str) -> None:
                         }
                     })
             else:
+                print("❌ DEBUG: Failed to get query embeddings")
+                
                 # Embedding generation failed
                 st.session_state.chat_history.append({
                     'role': 'assistant',
@@ -331,6 +362,10 @@ def process_user_query(query: str) -> None:
                 })
     
     except Exception as e:
+        print(f"❌ DEBUG: Error in process_user_query: {e}")
+        import traceback
+        print(f"❌ DEBUG: Full traceback: {traceback.format_exc()}")
+        
         # Error handling with model info
         st.session_state.chat_history.append({
             'role': 'assistant',
@@ -356,21 +391,58 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
     
     relevant_chunks = []
     
-    for doc in st.session_state.documents:
-        for i, embedding in enumerate(doc['embeddings']):
-            # Calculate cosine similarity
-            similarity = cosine_similarity(query_embedding, embedding)
+    # Search through both regular documents and uploaded documents (including web URLs)
+    all_documents = []
+    
+    # Add regular documents
+    if 'documents' in st.session_state:
+        all_documents.extend(st.session_state.documents)
+        print(f"🔍 DEBUG: Found {len(st.session_state.documents)} regular documents")
+    
+    # Add uploaded documents (including web URLs)
+    if 'uploaded_documents' in st.session_state:
+        all_documents.extend(st.session_state.uploaded_documents)
+        print(f"🔍 DEBUG: Found {len(st.session_state.uploaded_documents)} uploaded documents (including web URLs)")
+    
+    print(f"🔍 DEBUG: Total documents to search: {len(all_documents)}")
+    
+    for doc_idx, doc in enumerate(all_documents):
+        print(f"🔍 DEBUG: Processing document {doc_idx + 1}/{len(all_documents)}: {doc.get('name', 'Unknown')} (type: {doc.get('file_type', 'FILE')})")
+        
+        # Skip documents without embeddings
+        if 'embeddings' not in doc or not doc['embeddings']:
+            print(f"⚠️ DEBUG: Document {doc.get('name', 'Unknown')} has no embeddings, skipping")
+            continue
             
-            # Filter out chunks below similarity threshold
-            if similarity >= MIN_SIMILARITY_THRESHOLD:
-                chunk_data = {
-                    'content': doc['chunks'][i],
-                    'document': doc['name'],
-                    'similarity': similarity,
-                    'chunk_index': i,
-                    'doc_name': doc['name']
-                }
-                relevant_chunks.append(chunk_data)
+        print(f"🔍 DEBUG: Document {doc.get('name', 'Unknown')} has {len(doc['embeddings'])} embeddings")
+        
+        for i, embedding in enumerate(doc['embeddings']):
+            try:
+                # Calculate cosine similarity
+                similarity = cosine_similarity(query_embedding, embedding)
+                print(f"🔍 DEBUG: Chunk {i} similarity: {similarity:.4f}")
+                
+                # Filter out chunks below similarity threshold
+                if similarity >= MIN_SIMILARITY_THRESHOLD:
+                    chunk_data = {
+                        'content': doc['chunks'][i],
+                        'document': doc['name'],
+                        'similarity': similarity,
+                        'chunk_index': i,
+                        'doc_name': doc['name'],
+                        'doc_type': doc.get('file_type', 'FILE'),  # Add document type for debugging
+                        'source_url': doc.get('source_url', None)  # Add source URL for web content
+                    }
+                    relevant_chunks.append(chunk_data)
+                    print(f"✅ DEBUG: Added chunk {i} from {doc.get('name', 'Unknown')} (similarity: {similarity:.4f})")
+                else:
+                    print(f"❌ DEBUG: Chunk {i} below threshold ({similarity:.4f} < {MIN_SIMILARITY_THRESHOLD})")
+                    
+            except Exception as e:
+                print(f"❌ DEBUG: Error calculating similarity for chunk {i} in {doc.get('name', 'Unknown')}: {e}")
+                continue
+    
+    print(f"🔍 DEBUG: Found {len(relevant_chunks)} relevant chunks total")
     
     # Sort by similarity
     relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
@@ -394,8 +466,10 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
             if chunk not in reranked_chunks:
                 reranked_chunks.append(chunk)
         
+        print(f"🔍 DEBUG: Reranked to {len(reranked_chunks)} chunks from {len(used_docs)} documents")
         return reranked_chunks[:top_k]
     
+    print(f"🔍 DEBUG: Returning top {min(top_k, len(relevant_chunks))} chunks")
     return relevant_chunks[:top_k]
 
 
@@ -469,7 +543,7 @@ DOCUMENT CONTEXT:
 {context}
 
 Please provide a detailed, accurate answer based solely on the context above."""
-
+    
     # Try LlamaStack with optimized parameters
     try:
         response = st.session_state.llamastack_client.chat_completion(
@@ -501,7 +575,7 @@ def try_ollama_completion(query: str, context: str, model: str) -> str:
     
     try:
         prompt = f"""Based on these document excerpts, answer the question:
-
+        
 Question: {query}
 
 Documents:

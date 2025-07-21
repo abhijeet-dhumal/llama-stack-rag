@@ -1,8 +1,8 @@
 # Core Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+fastapi==0.115.0
+uvicorn[standard]==0.34.0
+pydantic==2.8.0
+pydantic-settings==2.5.2
 
 # LlamaStack & ML
 llama-stack>=0.0.40
@@ -12,7 +12,7 @@ transformers>=4.35.0
 sentence-transformers>=2.2.0
 
 # Document Processing - Focus on Docling AI
-docling>=2.0.0
+docling==2.41.0
 python-docx>=1.1.0
 python-multipart>=0.0.6
 newspaper3k>=0.2.8
