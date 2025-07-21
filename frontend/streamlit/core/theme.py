@@ -134,12 +134,12 @@ def inject_dark_theme_css():
         --sidebar-background: #1e1e2e;
         --text-color: #fafafa;
         --secondary-text: #b3b3b3;
-        --border-color: #333;
+        --border-color: #4a4a4a;
         --user-message-bg: #007bff;
         --assistant-message-bg: #3a3a3a;
         --assistant-message-text: #fafafa;
-        --section-border: #404040;
-        --separator-color: #2d2d2d;
+        --section-border: #555555;
+        --separator-color: #444444;
     }
     
     /* Main App Background - Full Page */
@@ -154,7 +154,7 @@ def inject_dark_theme_css():
     .stAppHeader,
     section[data-testid="stHeader"] {
         background-color: var(--background-color) !important;
-        border-bottom: 1px solid var(--border-color) !important;
+        border-bottom: none !important;
     }
     
     /* Header elements styling */
@@ -202,6 +202,8 @@ def inject_dark_theme_css():
     div[data-testid="stSidebar"] {
         background-color: var(--sidebar-background) !important;
         color: var(--text-color) !important;
+        border-right: 2px solid var(--border-color) !important;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3) !important;
     }
     
     /* Sidebar Content */
@@ -217,11 +219,116 @@ def inject_dark_theme_css():
         color: var(--text-color) !important;
     }
     
+    /* Sidebar Form Elements with Visible Borders */
+    .stSidebar .stTextInput > div > div > input,
+    .stSidebar .stSelectbox > div > div > div,
+    .stSidebar .stNumberInput > div > div > input {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+    }
+    
+    .stSidebar .stTextInput > div > div > input:focus,
+    .stSidebar .stSelectbox > div > div > div:focus,
+    .stSidebar .stNumberInput > div > div > input:focus {
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
+    }
+    
+    /* Specific styling for dropdown/select elements */
+    .stSidebar .stSelectbox > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+        min-height: 38px !important;
+    }
+    
+    /* Dropdown arrow and container */
+    .stSidebar .stSelectbox > div > div > div > div {
+        border: none !important;
+        background: transparent !important;
+    }
+    
+    /* Dropdown options container */
+    .stSidebar .stSelectbox > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Individual dropdown options */
+    .stSidebar .stSelectbox > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        background-color: var(--secondary-background) !important;
+        border-bottom: 1px solid var(--separator-color) !important;
+        padding: 8px 12px !important;
+    }
+    
+    .stSidebar .stSelectbox > div > div > div > div > div > div:hover {
+        background-color: var(--border-color) !important;
+    }
+    
+    .stSidebar .stSelectbox > div > div > div > div > div > div:last-child {
+        border-bottom: none !important;
+    }
+    
+    /* Dropdown arrow styling */
+    .stSidebar .stSelectbox > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+    }
+    
+    /* Selected value in dropdown */
+    .stSidebar .stSelectbox > div > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Dropdown arrow icon */
+    .stSidebar .stSelectbox svg {
+        fill: var(--text-color) !important;
+        color: var(--text-color) !important;
+    }
+    
+    /* Global select box styling for consistency */
+    .stSelectbox > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+    }
+    
+    .stSelectbox > div > div > div:focus {
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
+    }
+    
+    /* Global select box options */
+    .stSelectbox > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    .stSelectbox > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        background-color: var(--secondary-background) !important;
+        border-bottom: 1px solid var(--separator-color) !important;
+    }
+    
+    .stSelectbox > div > div > div > div > div > div:hover {
+        background-color: var(--border-color) !important;
+    }
+    
     /* Sidebar Section Separators */
     .stSidebar hr {
         border-color: var(--section-border) !important;
         border-width: 1px !important;
         margin: 1rem 0 !important;
+        opacity: 1 !important;
     }
     
     /* Sidebar Section Headers */
@@ -230,7 +337,7 @@ def inject_dark_theme_css():
     .stSidebar h3,
     .stSidebar h4 {
         color: var(--text-color) !important;
-        border-bottom: 1px solid var(--section-border) !important;
+        border-bottom: 2px solid var(--section-border) !important;
         padding-bottom: 0.5rem !important;
         margin-bottom: 1rem !important;
     }
@@ -239,7 +346,7 @@ def inject_dark_theme_css():
     .stSidebar .streamlit-expanderHeader {
         background-color: var(--secondary-background) !important;
         color: var(--text-color) !important;
-        border: 1px solid var(--section-border) !important;
+        border: 2px solid var(--section-border) !important;
         border-radius: 4px !important;
     }
     
@@ -253,7 +360,7 @@ def inject_dark_theme_css():
     
     /* Section Containers */
     .stSidebar > div {
-        border-bottom: 1px solid var(--separator-color) !important;
+        border-bottom: 2px solid var(--separator-color) !important;
         padding-bottom: 1rem !important;
         margin-bottom: 1rem !important;
     }
@@ -908,6 +1015,233 @@ def inject_dark_theme_css():
     .dark-theme .theme-toggle-small .stButton button:hover {
         background: rgba(0, 0, 0, 0.9) !important;
     }
+    
+    /* Enhanced dropdown styling to ensure visible borders */
+    .stSelectbox > div > div > div {
+        border: 3px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+        outline: none !important;
+        box-shadow: 0 0 0 1px var(--section-border) !important;
+    }
+    
+    /* Force visible borders on dropdown containers */
+    .stSelectbox > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        min-height: 38px !important;
+    }
+    
+    /* Dropdown trigger element */
+    .stSelectbox > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+        min-height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 8px 12px !important;
+    }
+    
+    /* Dropdown options container */
+    .stSelectbox > div > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Individual dropdown options */
+    .stSelectbox > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        background-color: var(--secondary-background) !important;
+        border-bottom: 1px solid var(--separator-color) !important;
+        padding: 8px 12px !important;
+    }
+    
+    .stSelectbox > div > div > div > div > div > div > div:hover {
+        background-color: var(--border-color) !important;
+    }
+    
+    /* Dropdown arrow */
+    .stSelectbox svg {
+        fill: var(--text-color) !important;
+        color: var(--text-color) !important;
+    }
+    
+    /* COMPREHENSIVE FIXES FOR HORIZONTAL LINES AND DROPDOWN BORDERS */
+    
+    /* Remove ALL horizontal lines from header and sidebar */
+    header,
+    div[data-testid="stHeader"],
+    .stAppHeader,
+    section[data-testid="stHeader"],
+    .stSidebar,
+    .css-1d391kg,
+    .css-1cypcdb,
+    .css-17eq0hr,
+    section[data-testid="stSidebar"],
+    div[data-testid="stSidebar"],
+    .stApp > header,
+    .stApp header,
+    [data-testid="stHeader"],
+    .css-18ni7ap,
+    .css-1dp5vir {
+        border-top: none !important;
+        border-bottom: none !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    
+    /* Force remove any Streamlit default borders */
+    .stApp,
+    .main,
+    .block-container {
+        border-top: none !important;
+        border-bottom: none !important;
+    }
+    
+    /* AGGRESSIVE DROPDOWN BORDER FIXING */
+    
+    /* Target ALL possible selectbox selectors */
+    .stSelectbox,
+    .stSelectbox *,
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] *,
+    .stSelectbox > div,
+    .stSelectbox > div > div,
+    .stSelectbox > div > div > div,
+    .stSelectbox > div > div > div > div,
+    .stSelectbox > div > div > div > div > div,
+    .stSelectbox > div > div > div > div > div > div {
+        border: 3px solid var(--section-border) !important;
+        border-radius: 6px !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        outline: 2px solid var(--section-border) !important;
+        box-shadow: 0 0 0 2px var(--section-border) !important;
+    }
+    
+    /* Specific styling for the main selectbox container */
+    .stSelectbox > div > div > div {
+        border: 4px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 8px !important;
+        outline: 3px solid var(--section-border) !important;
+        box-shadow: 
+            0 0 0 3px var(--section-border),
+            0 2px 8px rgba(0, 0, 0, 0.3) !important;
+        min-height: 40px !important;
+        padding: 4px !important;
+    }
+    
+    /* Force visible borders on the dropdown trigger */
+    .stSelectbox > div > div > div > div > div {
+        border: 3px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+        min-height: 36px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 8px 12px !important;
+        outline: 2px solid var(--section-border) !important;
+        box-shadow: 0 0 0 2px var(--section-border) !important;
+    }
+    
+    /* Dropdown options container with strong borders */
+    .stSelectbox > div > div > div > div > div > div {
+        border: 3px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        box-shadow: 
+            0 4px 12px rgba(0, 0, 0, 0.4),
+            0 0 0 2px var(--section-border) !important;
+        outline: 2px solid var(--section-border) !important;
+    }
+    
+    /* Individual dropdown options */
+    .stSelectbox > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        background-color: var(--secondary-background) !important;
+        border-bottom: 2px solid var(--separator-color) !important;
+        padding: 10px 12px !important;
+        border-left: 2px solid var(--section-border) !important;
+        border-right: 2px solid var(--section-border) !important;
+    }
+    
+    .stSelectbox > div > div > div > div > div > div > div:hover {
+        background-color: var(--border-color) !important;
+        border-left: 3px solid #007bff !important;
+        border-right: 3px solid #007bff !important;
+    }
+    
+    /* Remove borders from last option */
+    .stSelectbox > div > div > div > div > div > div > div:last-child {
+        border-bottom: none !important;
+    }
+    
+    /* Ensure dropdown arrow is visible */
+    .stSelectbox svg,
+    .stSelectbox * svg {
+        fill: var(--text-color) !important;
+        color: var(--text-color) !important;
+        stroke: var(--text-color) !important;
+    }
+    
+    /* Force focus states */
+    .stSelectbox > div > div > div:focus,
+    .stSelectbox > div > div > div > div:focus,
+    .stSelectbox > div > div > div > div > div:focus {
+        border-color: #007bff !important;
+        outline-color: #007bff !important;
+        box-shadow: 
+            0 0 0 3px rgba(0, 123, 255, 0.5),
+            0 0 0 2px #007bff !important;
+    }
+    
+    /* Override Streamlit's default styling */
+    .stSelectbox > div > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        font-weight: 500 !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+    
+    /* Force remove any Streamlit default borders that might be interfering */
+    .stSelectbox > div > div > div > div > div > div > div > div > div {
+        border: none !important;
+        background-color: transparent !important;
+    }
+    
+    /* Additional specificity for dropdown borders */
+    .stSelectbox > div > div > div > div > div > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+    }
+    
+    /* Ensure the dropdown is visible even if Streamlit tries to hide it */
+    .stSelectbox > div > div > div > div > div > div {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 9999 !important;
+        position: relative !important;
+    }
+    
+    /* Force the dropdown to be above other elements */
+    .stSelectbox > div > div > div > div > div > div > div {
+        position: relative !important;
+        z-index: 10000 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -991,6 +1325,8 @@ def inject_light_theme_css():
     div[data-testid="stSidebar"] {
         background-color: var(--sidebar-background) !important;
         color: var(--text-color) !important;
+        border-right: 2px solid var(--border-color) !important;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3) !important;
     }
     
     /* Sidebar Content */
@@ -1004,6 +1340,110 @@ def inject_light_theme_css():
     .stSidebar .stRadio,
     .stSidebar .stCheckbox {
         color: var(--text-color) !important;
+    }
+    
+    /* Sidebar Form Elements with Visible Borders */
+    .stSidebar .stTextInput > div > div > input,
+    .stSidebar .stSelectbox > div > div > div,
+    .stSidebar .stNumberInput > div > div > input {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+    }
+    
+    .stSidebar .stTextInput > div > div > input:focus,
+    .stSidebar .stSelectbox > div > div > div:focus,
+    .stSidebar .stNumberInput > div > div > input:focus {
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
+    }
+    
+    /* Specific styling for dropdown/select elements */
+    .stSidebar .stSelectbox > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+        min-height: 38px !important;
+    }
+    
+    /* Dropdown arrow and container */
+    .stSidebar .stSelectbox > div > div > div > div {
+        border: none !important;
+        background: transparent !important;
+    }
+    
+    /* Dropdown options container */
+    .stSidebar .stSelectbox > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Individual dropdown options */
+    .stSidebar .stSelectbox > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        background-color: var(--secondary-background) !important;
+        border-bottom: 1px solid var(--separator-color) !important;
+        padding: 8px 12px !important;
+    }
+    
+    .stSidebar .stSelectbox > div > div > div > div > div > div:hover {
+        background-color: var(--border-color) !important;
+    }
+    
+    .stSidebar .stSelectbox > div > div > div > div > div > div:last-child {
+        border-bottom: none !important;
+    }
+    
+    /* Dropdown arrow styling */
+    .stSidebar .stSelectbox > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+    }
+    
+    /* Selected value in dropdown */
+    .stSidebar .stSelectbox > div > div > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Dropdown arrow icon */
+    .stSidebar .stSelectbox svg {
+        fill: var(--text-color) !important;
+        color: var(--text-color) !important;
+    }
+    
+    /* Global select box styling for consistency */
+    .stSelectbox > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        color: var(--text-color) !important;
+        border-radius: 6px !important;
+    }
+    
+    .stSelectbox > div > div > div:focus {
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
+    }
+    
+    /* Global select box options */
+    .stSelectbox > div > div > div > div > div {
+        border: 2px solid var(--section-border) !important;
+        background-color: var(--secondary-background) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    .stSelectbox > div > div > div > div > div > div {
+        color: var(--text-color) !important;
+        background-color: var(--secondary-background) !important;
+        border-bottom: 1px solid var(--separator-color) !important;
+    }
+    
+    .stSelectbox > div > div > div > div > div > div:hover {
+        background-color: var(--border-color) !important;
     }
     
     /* Sidebar Section Separators */

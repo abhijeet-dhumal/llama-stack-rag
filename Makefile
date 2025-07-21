@@ -163,7 +163,7 @@ start:
 	@ollama serve > /dev/null 2>&1 &
 	@sleep 3
 	@echo "   Starting LlamaStack..."
-	@llama stack run ./llamastack/config/llamastack-config.yaml > /dev/null 2>&1 &
+	@source venv/bin/activate && llama stack run ./llamastack/config/llamastack-config.yaml > /dev/null 2>&1 &
 	@sleep 3
 	@echo "✅ Services started!"
 	@echo "🌐 Open http://localhost:8501 in your browser"
@@ -213,7 +213,7 @@ restart: stop
 	@ollama serve > /dev/null 2>&1 &
 	@sleep 3
 	@echo "   Starting LlamaStack..."
-	@llama stack run ./llamastack/config/llamastack-config.yaml > /dev/null 2>&1 &
+	@source venv/bin/activate && llama stack run ./llamastack/config/llamastack-config.yaml > /dev/null 2>&1 &
 	@sleep 3
 	@echo "   Starting Streamlit..."
 	@echo "✅ Services restarted! Run 'make start' to open the application"
@@ -237,7 +237,8 @@ stop-ollama:
 # Start LlamaStack server
 llamastack:
 	@echo "🦙 Starting LlamaStack server..."
-	llama stack run ./llamastack/config/llamastack-config.yaml
+	@echo "   Activating virtual environment..."
+	@source venv/bin/activate && llama stack run ./llamastack/config/llamastack-config.yaml
 
 # Start Ollama server
 ollama:

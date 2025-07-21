@@ -46,9 +46,10 @@ class LlamaStackClient:
                     elif model.get("model_type") == "llm":
                         llm_models.append(model_info)
                         
-                # Add local Ollama LLM models (but not embeddings)
-                ollama_llm_models = self._get_ollama_llm_models()
-                llm_models.extend(ollama_llm_models)
+                # Add local Ollama LLM models (but not embeddings) if LlamaStack doesn't have them
+                if not llm_models:
+                    ollama_llm_models = self._get_ollama_llm_models()
+                    llm_models.extend(ollama_llm_models)
                 
                 all_models = embedding_models + llm_models
                 
@@ -60,7 +61,7 @@ class LlamaStackClient:
         except Exception as e:
             print(f"Error getting models: {e}")
         
-            return self._get_default_models()
+        return self._get_default_models()
     
     def _get_ollama_llm_models(self) -> List[Dict[str, str]]:
         """Get LLM models from Ollama directly (no embeddings)"""
@@ -98,6 +99,19 @@ class LlamaStackClient:
             "llm": [default_llm],
             "all": [default_embedding, default_llm]
         }
+    
+    def _get_llamastack_models(self) -> List[str]:
+        """Get list of available model identifiers from LlamaStack"""
+        try:
+            response = self.session.get(f"{self.base_url}/models", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                # Use 'identifier' field instead of 'model_id'
+                return [model.get('identifier', '') for model in data.get('data', []) if model.get('identifier')]
+            return []
+        except Exception as e:
+            print(f"Error getting LlamaStack models: {e}")
+            return []
     
     def get_embeddings(self, text: str, model: str = "all-MiniLM-L6-v2") -> Optional[List[float]]:
         """Get embeddings using LlamaStack inference/embeddings endpoint with sentence-transformers"""
@@ -165,6 +179,25 @@ class LlamaStackClient:
             
             print(f"🔄 Attempting LlamaStack completion with model: {model}")
             
+            # Get available models from LlamaStack to try different formats
+            available_models = self._get_llamastack_models()
+            model_variants = [model]
+            
+            # If this is an Ollama model, try different formats that LlamaStack might use
+            if model in ["llama3.2:1b", "llama3.2:3b", "ibm/granite3.3:2b-base"]:
+                # Check if any of these variants exist in LlamaStack's available models
+                possible_variants = [
+                    model,
+                    f"ollama/{model}",
+                    model.split(":")[0] if ":" in model else model,
+                    f"ollama/{model.split(':')[0]}" if ":" in model else f"ollama/{model}"
+                ]
+                
+                # Only add variants that actually exist in LlamaStack
+                for variant in possible_variants:
+                    if variant in available_models:
+                        model_variants.append(variant)
+            
             # Try different endpoint configurations for LlamaStack
             endpoint_configs = [
                 {
@@ -204,49 +237,62 @@ class LlamaStackClient:
                 }
             ]
             
-            for config in endpoint_configs:
-                try:
-                    url = f"{self.base_url}{config['url']}"
-                    print(f"📡 Trying endpoint: {url}")
-                    response = self.session.post(url, json=config['payload'], timeout=60)
-                    print(f"📡 Response status: {response.status_code}")
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        print(f"📡 Response data: {data}")
+            # Try each model variant with each endpoint
+            for model_variant in model_variants:
+                for config in endpoint_configs:
+                    try:
+                        url = f"{self.base_url}{config['url']}"
+                        print(f"📡 Trying endpoint: {url} with model: {model_variant}")
                         
-                        # Handle LlamaStack completion response format
-                        if "completion_message" in data and "content" in data["completion_message"]:
-                            content = data["completion_message"]["content"]
-                            if content and len(content.strip()) > 10:
-                                print(f"✅ LlamaStack success via {config['url']}")
-                                return content.strip()
+                        # Update payload with current model variant
+                        payload = config['payload'].copy()
+                        if 'model_id' in payload:
+                            payload['model_id'] = model_variant
+                        if 'model' in payload:
+                            payload['model'] = model_variant
                         
-                        # Handle LlamaStack simple completion format
-                        elif "content" in data:
-                            content = data["content"]
-                            if content and len(content.strip()) > 10:
-                                print(f"✅ LlamaStack success via {config['url']}")
-                                return content.strip()
+                        response = self.session.post(url, json=payload, timeout=60)
+                        print(f"📡 Response status: {response.status_code}")
                         
-                        # Handle OpenAI-compatible format
-                        elif "choices" in data and len(data["choices"]) > 0:
-                            content = data["choices"][0].get("message", {}).get("content", "")
-                            if content and len(content.strip()) > 10:
-                                print(f"✅ LlamaStack success via {config['url']}")
-                                return content.strip()
-                        
-                        # Handle simple text response
-                        elif isinstance(data, str) and len(data.strip()) > 10:
-                            print(f"✅ LlamaStack success via {config['url']}")
-                            return data.strip()
-                        
-                        else:
-                            print(f"⚠️ Unexpected response format from {config['url']}")
+                        if response.status_code == 200:
+                            data = response.json()
+                            print(f"📡 Response data: {data}")
                             
-                except Exception as e:
-                    print(f"❌ Error with {config['url']}: {str(e)}")
-                    continue
+                            # Handle LlamaStack completion response format
+                            if "completion_message" in data and "content" in data["completion_message"]:
+                                content = data["completion_message"]["content"]
+                                if content and len(content.strip()) > 10:
+                                    print(f"✅ LlamaStack success via {config['url']} with model {model_variant}")
+                                    return content.strip()
+                            
+                            # Handle LlamaStack simple completion format
+                            elif "content" in data:
+                                content = data["content"]
+                                if content and len(content.strip()) > 10:
+                                    print(f"✅ LlamaStack success via {config['url']} with model {model_variant}")
+                                    return content.strip()
+                            
+                            # Handle OpenAI-compatible format
+                            elif "choices" in data and len(data["choices"]) > 0:
+                                content = data["choices"][0].get("message", {}).get("content", "")
+                                if content and len(content.strip()) > 10:
+                                    print(f"✅ LlamaStack success via {config['url']} with model {model_variant}")
+                                    return content.strip()
+                            
+                            # Handle simple text response
+                            elif isinstance(data, str) and len(data.strip()) > 10:
+                                print(f"✅ LlamaStack success via {config['url']} with model {model_variant}")
+                                return data.strip()
+                            
+                            else:
+                                print(f"⚠️ Unexpected response format from {config['url']}")
+                                
+                        elif response.status_code == 400 and "not found" in response.text.lower():
+                            print(f"❌ Model {model_variant} not found in LlamaStack")
+                            continue
+                                
+                    except Exception as e:
+                        print(f"❌ Error with {config['url']} and model {model_variant}: {str(e)}")
             
             # If all LlamaStack endpoints failed, try Ollama directly
             print("🔄 All LlamaStack endpoints failed, trying Ollama directly...")

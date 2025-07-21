@@ -87,15 +87,15 @@ make start-frontend
 ## 📸 **Screenshots**
 
 ### **Main Application Interface**
-![Main Interface](data/images/Screenshot%202025-07-20%20at%2011.11.29%20PM.png)
+![Main Interface](data/images/Screenshot_2025-07-20_at_11.11.29 PM.png)
 *Clean, modern interface with sidebar controls and main chat area*
 
 ### **Document Processing & Chat**
-![Document Processing](data/images/Screenshot%202025-07-20%20at%2011.12.41%20PM.png) 
+![Document Processing](/data/images/Screenshot_2025-07-20_at_11.12.41 PM.png) 
 *Real-time document processing with performance metrics and intelligent chat responses*
 
 ### **System Status & Diagnostics**
-![System Status](data/images/Screenshot%202025-07-20%20at%2011.13.52%20PM.png)
+![System Status](/data/images/Screenshot_2025-07-20_at_11.13.52 PM.png)
 *Comprehensive system monitoring with LlamaStack and Ollama status indicators*
 
 ---
@@ -118,17 +118,17 @@ graph TB
     
     subgraph "🧠 Core Processing"
         DOC_HANDLER[📄 Document Handler<br/>Embedding: all-MiniLM-L6-v2<br/>Similarity: Cosine + 0.25 threshold]
-        WEB_PROC[🌐 Web Content Processor<br/>MCP: @just-every/mcp-read-website-fast<br/>Fallback: BeautifulSoup]
+        WEB_PROC[🌐 Web Content Processor<br/>MCP: just-every mcp-read-website-fast<br/>Fallback: BeautifulSoup]
         CHAT_ENGINE[💬 Chat Engine<br/>Temperature: 0.4<br/>Max Tokens: 1024]
         MODEL_MGR[🤖 Model Manager<br/>Filter: Ollama-only models<br/>Status: Real-time polling]
         THEME_MGR[🎨 Theme Manager<br/>CSS: Custom styles<br/>Responsive: Mobile-friendly]
     end
     
     subgraph "🌐 Web Content Processing"
-        MCP_SERVER[🔧 MCP Server<br/>Command: fetch<br/>Output: markdown/json<br/>Timeout: 30s]
-        BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Parser: html.parser<br/>Clean: markdownify]
+        MCP_SERVER[🔧 MCP Server<br/>Command: fetch<br/>Output: markdown json<br/>Timeout: 30s]
+        BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Parser: html parser<br/>Clean: markdownify]
         WEB_EXTRACT[📝 Content Extraction<br/>Readability: Mozilla<br/>Metadata: Title, URL]
-        URL_VALIDATE[✅ URL Validation<br/>Schemes: http/https<br/>Format: urlparse]
+        URL_VALIDATE[✅ URL Validation<br/>Schemes: http https<br/>Format: urlparse]
     end
     
     subgraph "🦙 LlamaStack Integration"
@@ -141,7 +141,7 @@ graph TB
     subgraph "🏠 Local AI (Ollama)"
         OLLAMA[🦙 Ollama Server<br/>Port: 11434<br/>Config: ollama-example.yaml]
         LOCAL_LLM[🤖 Local LLM Models<br/>Default: llama3.2:1b<br/>Alternative: llama3.2:3b]
-        MODEL_PULL[⬇️ Model Management<br/>Command: ollama pull<br/>Cache: ~/.ollama]
+        MODEL_PULL[⬇️ Model Management<br/>Command: ollama pull<br/>Cache: .ollama]
     end
     
     subgraph "💾 Storage & State"
@@ -154,7 +154,7 @@ graph TB
     subgraph "🔍 Debug & Monitoring"
         DEBUG_LOG[📝 Debug Logging<br/>Level: INFO/DEBUG<br/>Output: Console]
         ERROR_HANDLE[🛠️ Error Handling<br/>Type: Auto-convert<br/>Fallback: Graceful]
-        TYPE_CONVERT[🔄 Type Conversion<br/>Numpy→List<br/>Array→Scalar]
+        TYPE_CONVERT[🔄 Type Conversion<br/>Numpy to List<br/>Array to Scalar]
     end
     
     %% User Interactions
@@ -287,8 +287,8 @@ flowchart TD
     OPTIMIZE --> CHUNK[✂️ Smart Chunking<br/>3000 chars + 600 overlap<br/>Config: config.py<br/>CHARS_PER_CHUNK: 3000<br/>CHUNK_OVERLAP: 600]
     CHUNK --> BATCH[📦 Batch Processing<br/>Optimized embedding generation<br/>Parallel: 3 requests<br/>Timeout: 30s per batch]
     
-    BATCH --> EMBED[🧮 Generate Embeddings<br/>all-MiniLM-L6-v2<br/>Port: 8321 (LlamaStack)<br/>Dimensions: 384<br/>Model: sentence-transformers]
-    EMBED --> QUALITY[🎯 Quality Check<br/>Validate embeddings<br/>Type: List/Array<br/>Conversion: Numpy→List<br/>Error: Graceful fallback]
+    BATCH --> EMBED[🧮 Generate Embeddings<br/>all-MiniLM-L6-v2<br/>Port: 8321<br/>Dimensions: 384<br/>Model: sentence-transformers]
+    EMBED --> QUALITY[🎯 Quality Check<br/>Validate embeddings<br/>Type: List/Array<br/>Conversion: Numpy to List<br/>Error: Graceful fallback]
     
     QUALITY -->|✅ Success| STORE[💾 Store Document<br/>Session state + backup<br/>Location: st.session_state<br/>Format: JSON<br/>Persistence: Browser]
     QUALITY -->|⚠️ Partial| FALLBACK[🧪 Dummy Embeddings<br/>Ensure functionality<br/>Random: 384 dimensions<br/>Status: Demo mode]
@@ -314,9 +314,9 @@ flowchart TD
     QUERY([💬 User Question<br/>Interface: Streamlit Chat<br/>Port: 8501<br/>History: Session state]) --> CHECK{📊 Documents Available?<br/>Session: st.session_state<br/>Collections: documents + uploaded_documents<br/>Count: Real-time check}
     
     CHECK -->|❌ No| NO_DOCS[📝 No Documents Message<br/>Upload prompt<br/>UI: Sidebar guidance<br/>Status: Ready for upload]
-    CHECK -->|✅ Yes| EMBED_Q[🧮 Query Embedding<br/>all-MiniLM-L6-v2<br/>Port: 8321 (LlamaStack)<br/>Dimensions: 384<br/>Model: sentence-transformers]
+    CHECK -->|✅ Yes| EMBED_Q[🧮 Query Embedding<br/>all-MiniLM-L6-v2<br/>Port: 8321<br/>Dimensions: 384<br/>Model: sentence-transformers]
     
-    EMBED_Q --> SEARCH[🔍 Similarity Search<br/>Cosine similarity<br/>Algorithm: dot product / magnitudes<br/>Type: Auto-convert arrays<br/>Debug: Logged similarity scores]
+    EMBED_Q --> SEARCH[🔍 Similarity Search<br/>Cosine similarity<br/>Algorithm: dot product magnitudes<br/>Type: Auto-convert arrays<br/>Debug: Logged similarity scores]
     SEARCH --> FILTER[🎯 Relevance Filtering<br/>Threshold: 0.25<br/>Config: MIN_SIMILARITY_THRESHOLD<br/>Chunks: Top 4 relevant<br/>Diversity: Source balancing]
     
     FILTER --> RERANK[📊 Chunk Reranking<br/>Diversity + relevance<br/>Sources: Files + Web URLs<br/>Priority: Recent uploads<br/>Limit: 4 chunks max]
@@ -346,10 +346,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    URL_INPUT([🌐 Web URL Input<br/>Interface: Sidebar tab<br/>Port: 8501<br/>Validation: urlparse]) --> URL_VALIDATE{🔍 URL Validation<br/>Schemes: http/https<br/>Format: urlparse<br/>Domain: netloc check<br/>Config: WebContentProcessor}
+    URL_INPUT([🌐 Web URL Input<br/>Interface: Sidebar tab<br/>Port: 8501<br/>Validation: urlparse]) --> URL_VALIDATE{🔍 URL Validation<br/>Schemes: http https<br/>Format: urlparse<br/>Domain: netloc check<br/>Config: WebContentProcessor}
     
     URL_VALIDATE -->|❌ Invalid| URL_ERROR[❌ Invalid URL Error<br/>Format check<br/>User feedback<br/>UI: Error message]
-    URL_VALIDATE -->|✅ Valid| MCP_TRY[🔧 Try MCP Server<br/>@just-every/mcp-read-website-fast<br/>Command: fetch<br/>Output: markdown<br/>Timeout: 30s]
+    URL_VALIDATE -->|✅ Valid| MCP_TRY[🔧 Try MCP Server<br/>just-every mcp-read-website-fast<br/>Command: fetch<br/>Output: markdown<br/>Timeout: 30s]
     
     MCP_TRY -->|✅ Success| MCP_EXTRACT[📝 MCP Extraction<br/>Mozilla Readability<br/>Clean: markdown output<br/>Metadata: title, url<br/>Size: <50MB limit]
     MCP_TRY -->|❌ Failed| BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Direct HTML parsing<br/>Parser: html.parser<br/>Clean: markdownify<br/>Timeout: 30s]
@@ -363,7 +363,7 @@ flowchart TD
     SIZE_CHECK -->|❌ Too Large| SIZE_ERROR[❌ Size Limit Error<br/>>50MB<br/>User feedback<br/>Suggestion: Try smaller URL]
     SIZE_CHECK -->|✅ OK| WEB_CHUNK[✂️ Web Content Chunking<br/>Smart segmentation<br/>Config: CHARS_PER_CHUNK: 3000<br/>Overlap: 600 chars<br/>Format: Markdown]
     
-    WEB_CHUNK --> WEB_EMBED[🧮 Web Embedding Generation<br/>all-MiniLM-L6-v2<br/>Port: 8321 (LlamaStack)<br/>Dimensions: 384<br/>Model: sentence-transformers]
+    WEB_CHUNK --> WEB_EMBED[🧮 Web Embedding Generation<br/>all-MiniLM-L6-v2<br/>Port: 8321<br/>Dimensions: 384<br/>Model: sentence-transformers]
     WEB_EMBED --> WEB_STORE[💾 Store Web Content<br/>Unified with files<br/>Session: st.session_state<br/>Collection: uploaded_documents<br/>Type: WEB]
     
     WEB_STORE --> WEB_METRICS[📊 Web Processing Metrics<br/>Speed, quality, source<br/>Processing time<br/>Content size<br/>Source: MCP/BeautifulSoup]
@@ -400,14 +400,14 @@ graph TB
     end
     
     subgraph "🏠 Ollama Local AI"
-        OLLAMA_SERVER[🦙 Ollama Server<br/>Port: 11434<br/>Config: ollama-example.yaml<br/>Models: llama3.2:1b, llama3.2:3b<br/>Cache: ~/.ollama]
+        OLLAMA_SERVER[🦙 Ollama Server<br/>Port: 11434<br/>Config: ollama-example.yaml<br/>Models: llama3.2:1b, llama3.2:3b<br/>Cache: .ollama]
     end
     
     subgraph "🔧 MCP Web Processing"
-        MCP_SERVER[🔧 MCP Server<br/>Command: npx @just-every/mcp-read-website-fast<br/>Package: package.json<br/>Setup: make setup-mcp<br/>Node.js: >=16.0.0]
-        BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Parser: html.parser<br/>Clean: markdownify]
+        MCP_SERVER[🔧 MCP Server<br/>Command: npx just-every mcp-read-website-fast<br/>Package: package.json<br/>Setup: make setup-mcp<br/>Node.js: 16.0.0+]
+        BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Parser: html parser<br/>Clean: markdownify]
         WEB_EXTRACT[📝 Content Extraction<br/>Readability: Mozilla<br/>Metadata: Title, URL]
-        URL_VALIDATE[✅ URL Validation<br/>Schemes: http/https<br/>Format: urlparse]
+        URL_VALIDATE[✅ URL Validation<br/>Schemes: http https<br/>Format: urlparse]
     end
     
     subgraph "💾 Data Storage"
@@ -418,8 +418,8 @@ graph TB
     subgraph "📁 Configuration Files"
         ST_CONFIG[📄 .streamlit/config.toml<br/>Port: 8501<br/>Max Upload: 50MB<br/>Theme: Custom<br/>CORS: Enabled]
         LS_CONFIG[📄 llamastack/config/llamastack-config.yaml<br/>Port: 8321<br/>Provider: ollama<br/>APIs: inference, embeddings<br/>Health: /v1/health]
-        OLLAMA_CONFIG[📄 ollama-example.yaml<br/>Port: 11434<br/>Models: llama3.2:1b<br/>Provider: local<br/>Cache: ~/.ollama]
-        PKG_CONFIG[📄 package.json<br/>MCP: @just-every/mcp-read-website-fast<br/>Version: ^0.1.13<br/>Node: >=16.0.0]
+        OLLAMA_CONFIG[📄 ollama-example.yaml<br/>Port: 11434<br/>Models: llama3.2:1b<br/>Provider: local<br/>Cache: .ollama]
+        PKG_CONFIG[📄 package.json<br/>MCP: just-every mcp-read-website-fast<br/>Version: 0.1.13<br/>Node: 16.0.0+]
     end
     
     %% Connections

@@ -633,6 +633,11 @@ models:
   provider_id: ollama
   provider_model_id: llama3.2:3b
   model_type: llm
+- metadata: {}
+  model_id: ibm/granite3.3:2b-base
+  provider_id: ollama
+  provider_model_id: ibm/granite3.3:2b-base
+  model_type: llm
 shields:
 - shield_id: meta-llama/Llama-Guard-3-8B
 vector_dbs: []

@@ -1041,7 +1041,7 @@ def has_documents() -> bool:
 def get_document_count() -> int:
     """Get the total number of uploaded documents"""
     if 'uploaded_documents' in st.session_state:
-        return len(st.session_state.uploaded_documents)
+        return len(st.session_state.uploaded_documents) 
     return 0
 
 

@@ -122,13 +122,32 @@ def render_chat_interface() -> None:
         padding: 0.75rem 1rem;
         border-radius: 18px;
         word-wrap: break-word;
-        line-height: 1.4;
+        line-height: 1.5;
+        font-size: 0.95rem;
+        letter-spacing: 0.01em;
     }
     
     .user-bubble {
         background: linear-gradient(135deg, #007bff, #0056b3);
-        color: white;
+        background-color: #007bff; /* Fallback */
+        color: white !important;
         border-bottom-right-radius: 4px;
+        font-weight: 500;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #0056b3;
+    }
+    
+    .user-bubble * {
+        color: white !important;
+    }
+    
+    .user-message .message-bubble.user-bubble {
+        color: white !important;
+    }
+    
+    .user-message .message-bubble.user-bubble * {
+        color: white !important;
     }
     
     .assistant-bubble {
@@ -162,6 +181,34 @@ def render_chat_interface() -> None:
         font-size: 0.7em;
         border-left: 3px solid var(--info-color, #17a2b8);
     }
+    
+    /* Improve input field readability */
+    .stTextInput > div > div > input {
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+        color: #333 !important;
+        background-color: #ffffff !important;
+        border: 2px solid #e0e0e0 !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.1) !important;
+        outline: none !important;
+    }
+    
+    .stTextInput > div > div > input::placeholder {
+        color: #6c757d !important;
+        font-weight: 400 !important;
+    }
+    
+    /* Global override for user bubble text color */
+    .user-bubble, .user-bubble *, .user-message .message-bubble {
+        color: white !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -175,8 +222,8 @@ def render_chat_interface() -> None:
                 escaped_content = html.escape(message['content']).replace('\n', '<br>')
                 st.markdown(f"""
                 <div class="user-message">
-                    <div class="message-bubble user-bubble">
-                        {escaped_content}
+                    <div class="message-bubble user-bubble" style="color: white !important;">
+                        <span style="color: white !important;">{escaped_content}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
