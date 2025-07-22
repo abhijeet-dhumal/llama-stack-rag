@@ -213,6 +213,369 @@ graph TB
     style DEBUG_LOG fill:#f3e5f5
 ```
 
+### **🏗️ High-Level System Architecture**
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        STREAMLIT[Streamlit Web App<br/>Port: 8501<br/>User Interface]
+        AUTH[Authentication<br/>Session Management]
+        UI[User Interface<br/>Components & Pages]
+    end
+    
+    subgraph "API Layer"
+        LLAMASTACK[LlamaStack API<br/>Port: 8321<br/>AI Orchestration]
+        OLLAMA[Ollama API<br/>Port: 11434<br/>Local LLM]
+        MCP[MCP Server<br/>Web Content Extraction]
+    end
+    
+    subgraph "Data Layer"
+        SQLITE[(SQLite Database<br/>Metadata & Sessions)]
+        FAISS[(FAISS Vector DB<br/>Embeddings & Search)]
+        FILES[File Storage<br/>Documents & Assets]
+    end
+    
+    subgraph "Processing Layer"
+        EMBED[Embedding Engine<br/>sentence-transformers]
+        CHUNK[Chunking Engine<br/>Smart Text Segmentation]
+        VECTOR[Vector Search<br/>FAISS Index]
+    end
+    
+    STREAMLIT --> LLAMASTACK
+    STREAMLIT --> OLLAMA
+    STREAMLIT --> MCP
+    LLAMASTACK --> OLLAMA
+    LLAMASTACK --> EMBED
+    STREAMLIT --> SQLITE
+    STREAMLIT --> FAISS
+    EMBED --> FAISS
+    CHUNK --> EMBED
+    VECTOR --> FAISS
+```
+
+### **🗄️ Database Architecture**
+
+#### **SQLite Schema Design**
+
+```mermaid
+erDiagram
+    users {
+        int id PK
+        varchar username UK
+        varchar email UK
+        varchar password_hash
+        timestamp created_at
+        timestamp last_login
+        boolean is_active
+        varchar role
+    }
+    
+    documents {
+        int id PK
+        int user_id FK
+        varchar name
+        varchar file_type
+        real file_size_mb
+        varchar content_hash
+        text source_url
+        varchar domain
+        timestamp upload_time
+        varchar processing_status
+        int chunk_count
+        int character_count
+        text metadata
+    }
+    
+    document_chunks {
+        int id PK
+        int document_id FK
+        int chunk_index
+        text content
+        blob embedding_vector
+        timestamp created_at
+    }
+    
+    chat_sessions {
+        int id PK
+        int user_id FK
+        varchar title
+        timestamp created_at
+        timestamp updated_at
+        boolean is_active
+    }
+    
+    chat_messages {
+        int id PK
+        int chat_session_id FK
+        varchar role
+        text content
+        timestamp timestamp
+        text metadata
+    }
+    
+    faiss_indices {
+        int id PK
+        int user_id FK
+        varchar index_name
+        int vector_dimension
+        int total_vectors
+        timestamp created_at
+        timestamp updated_at
+        text index_file_path
+    }
+    
+    vector_mappings {
+        int id PK
+        int faiss_index_id FK
+        int document_chunk_id FK
+        int vector_index
+        timestamp created_at
+    }
+    
+    users ||--o{ documents : "owns"
+    users ||--o{ chat_sessions : "has"
+    users ||--o{ faiss_indices : "owns"
+    documents ||--o{ document_chunks : "contains"
+    chat_sessions ||--o{ chat_messages : "contains"
+    faiss_indices ||--o{ vector_mappings : "maps"
+    document_chunks ||--o{ vector_mappings : "mapped_to"
+```
+
+#### **FAISS Vector Database Structure**
+
+```mermaid
+graph TB
+    subgraph "FAISS Index Architecture"
+        FAISS_INDEX[FAISS Index<br/>IndexFlatL2<br/>384 dimensions]
+        
+        subgraph "Vector Storage"
+            VECTORS[Vector Array<br/>float32 384 per chunk]
+        end
+        
+        subgraph "Metadata Storage"
+            CHUNKS_META[Chunks Metadata<br/>List of Dict]
+            DOCS_META[Documents Metadata<br/>List of Dict]
+            MAPPING[Document Mapping<br/>Dict]
+        end
+        
+        subgraph "Search Operations"
+            QUERY_VEC[Query Vector<br/>384 dimensions]
+            SIMILARITY[Similarity Search<br/>L2 Distance]
+            TOP_K[Top-K Results<br/>Configurable]
+        end
+    end
+    
+    FAISS_INDEX --> VECTORS
+    FAISS_INDEX --> CHUNKS_META
+    FAISS_INDEX --> DOCS_META
+    FAISS_INDEX --> MAPPING
+    QUERY_VEC --> SIMILARITY
+    SIMILARITY --> TOP_K
+```
+
+### **🔧 Service Architecture**
+
+#### **Microservices Design**
+
+```mermaid
+graph LR
+    subgraph "Frontend Services"
+        STREAMLIT[Streamlit App<br/>Port 8501]
+        AUTH_SERVICE[Auth Service<br/>Session Management]
+        UI_SERVICE[UI Service<br/>Components]
+    end
+    
+    subgraph "AI Services"
+        LLAMASTACK[LlamaStack<br/>Port 8321]
+        OLLAMA[Ollama<br/>Port 11434]
+        MCP_SERVER[MCP Server<br/>Web Extraction]
+    end
+    
+    subgraph "Data Services"
+        SQLITE_SERVICE[SQLite Service<br/>Metadata]
+        FAISS_SERVICE[FAISS Service<br/>Vectors]
+        SYNC_SERVICE[Sync Service<br/>Data Sync]
+    end
+    
+    subgraph "Processing Services"
+        EMBED_SERVICE[Embedding Service<br/>sentence-transformers]
+        CHUNK_SERVICE[Chunking Service<br/>Text Processing]
+        SEARCH_SERVICE[Search Service<br/>Vector Search]
+    end
+    
+    STREAMLIT --> AUTH_SERVICE
+    STREAMLIT --> UI_SERVICE
+    STREAMLIT --> LLAMASTACK
+    STREAMLIT --> OLLAMA
+    STREAMLIT --> MCP_SERVER
+    LLAMASTACK --> OLLAMA
+    LLAMASTACK --> EMBED_SERVICE
+    EMBED_SERVICE --> FAISS_SERVICE
+    CHUNK_SERVICE --> EMBED_SERVICE
+    SEARCH_SERVICE --> FAISS_SERVICE
+    SYNC_SERVICE --> SQLITE_SERVICE
+    SYNC_SERVICE --> FAISS_SERVICE
+```
+
+### **🔄 Component Interaction Flow**
+
+#### **Document Processing Flow**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Streamlit
+    participant LS as LlamaStack
+    participant O as Ollama
+    participant DB as SQLite
+    participant F as FAISS
+    participant SM as Sync Manager
+
+    U->>S: Upload Document
+    S->>S: Validate File
+    S->>S: Extract Content
+    S->>S: Create Chunks
+    S->>LS: Generate Embeddings
+    LS->>O: Fallback if needed
+    S->>DB: Store Metadata
+    S->>F: Store Vectors
+    S->>SM: Sync Data
+    SM->>DB: Update Metadata
+    SM->>F: Update Index
+    S->>U: Processing Complete
+```
+
+#### **Query Processing Flow**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Streamlit
+    participant LS as LlamaStack
+    participant O as Ollama
+    participant F as FAISS
+    participant DB as SQLite
+
+    U->>S: Ask Question
+    S->>LS: Generate Query Embedding
+    S->>F: Vector Search
+    F->>S: Return Similar Chunks
+    S->>DB: Get Full Content
+    S->>S: Build Context
+    S->>LS: Generate Response
+    LS->>O: LLM Processing
+    O->>S: AI Response
+    S->>DB: Store Chat History
+    S->>U: Display Response
+```
+
+### **🔐 Security Architecture**
+
+```mermaid
+graph TB
+    subgraph "Authentication Layer"
+        AUTH[Authentication Service]
+        SESSION[Session Management]
+        TOKEN[Token Generation]
+        VALIDATE[Input Validation]
+    end
+    
+    subgraph "Data Security"
+        ENCRYPT[Data Encryption]
+        ISOLATE[User Isolation]
+        SANITIZE[Input Sanitization]
+        AUDIT[Audit Logging]
+    end
+    
+    subgraph "Network Security"
+        HTTPS[HTTPS/TLS]
+        CORS[CORS Configuration]
+        RATE_LIMIT[Rate Limiting]
+        FIREWALL[Firewall Rules]
+    end
+    
+    AUTH --> SESSION
+    SESSION --> TOKEN
+    TOKEN --> VALIDATE
+    VALIDATE --> SANITIZE
+    SANITIZE --> ISOLATE
+    ISOLATE --> ENCRYPT
+    ENCRYPT --> AUDIT
+    HTTPS --> CORS
+    CORS --> RATE_LIMIT
+    RATE_LIMIT --> FIREWALL
+```
+
+### **📊 Performance Architecture**
+
+#### **Caching Strategy**
+
+```mermaid
+graph LR
+    subgraph "Cache Layers"
+        BROWSER[Browser Cache<br/>Static Assets]
+        CDN[CDN Cache<br/>Global Assets]
+        APP[Application Cache<br/>Session Data]
+        MODEL[Model Cache<br/>AI Models]
+        VECTOR[Vector Cache<br/>Embeddings]
+    end
+    
+    subgraph "Cache Policies"
+        TTL[Time-to-Live]
+        LRU[Least Recently Used]
+        LFU[Least Frequently Used]
+        WRITE_THROUGH[Write-Through]
+        WRITE_BEHIND[Write-Behind]
+    end
+    
+    BROWSER --> TTL
+    CDN --> TTL
+    APP --> LRU
+    MODEL --> LFU
+    VECTOR --> WRITE_THROUGH
+```
+
+### **🔧 Deployment Architecture**
+
+#### **Container Orchestration**
+
+```mermaid
+graph TB
+    subgraph "Docker Containers"
+        STREAMLIT_CONTAINER[Streamlit Container<br/>Port 8501]
+        LLAMASTACK_CONTAINER[LlamaStack Container<br/>Port 8321]
+        OLLAMA_CONTAINER[Ollama Container<br/>Port 11434]
+        MCP_CONTAINER[MCP Container<br/>Web Extraction]
+    end
+    
+    subgraph "Persistent Storage"
+        VOLUME_DB[Database Volume<br/>SQLite Files]
+        VOLUME_FAISS[FAISS Volume<br/>Vector Files]
+        VOLUME_MODELS[Models Volume<br/>AI Models]
+        VOLUME_LOGS[Logs Volume<br/>Application Logs]
+    end
+    
+    subgraph "Network"
+        NETWORK[Internal Network<br/>Service Communication]
+        EXTERNAL[External Network<br/>User Access]
+    end
+    
+    STREAMLIT_CONTAINER --> VOLUME_DB
+    STREAMLIT_CONTAINER --> VOLUME_FAISS
+    STREAMLIT_CONTAINER --> VOLUME_LOGS
+    LLAMASTACK_CONTAINER --> VOLUME_MODELS
+    OLLAMA_CONTAINER --> VOLUME_MODELS
+    MCP_CONTAINER --> VOLUME_LOGS
+    
+    STREAMLIT_CONTAINER --> NETWORK
+    LLAMASTACK_CONTAINER --> NETWORK
+    OLLAMA_CONTAINER --> NETWORK
+    MCP_CONTAINER --> NETWORK
+    
+    EXTERNAL --> STREAMLIT_CONTAINER
+```
+```
+
 ### **Technology Stack**
 
 ```mermaid
