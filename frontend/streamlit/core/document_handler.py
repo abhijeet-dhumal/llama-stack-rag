@@ -241,6 +241,76 @@ def get_local_embedding_model():
     return _embedding_model
 
 
+def generate_embeddings_batch_optimized(chunks: List[str], progress_bar, status_text, start_progress: float = 0.0, file_id: str = None) -> tuple[List[List[float]], int]:
+    """Generate embeddings with progress tracking and error handling"""
+    if not chunks:
+        return [], 0
+    
+    model = get_local_embedding_model()
+    embeddings = []
+    embedding_errors = 0
+    
+    try:
+        # Generate real embeddings in batches for efficiency
+        batch_size = 32
+        total_batches = (len(chunks) + batch_size - 1) // batch_size
+        
+        for i in range(0, len(chunks), batch_size):
+            # Check for interruption
+            if file_id and file_id not in st.session_state.currently_uploading:
+                raise InterruptedError(f"Upload interrupted for {file_id}")
+            
+            batch = chunks[i:i + batch_size]
+            batch_num = i // batch_size + 1
+            
+            # Update progress
+            progress = start_progress + (batch_num / total_batches) * 0.4  # 40% of remaining progress
+            progress_bar.progress(progress)
+            status_text.text(f"🧠 Generating embeddings... ({batch_num}/{total_batches})")
+            
+            try:
+                if model is not None:
+                    # Use real model
+                    batch_embeddings = model.encode(batch, convert_to_tensor=False, show_progress_bar=False)
+                    embeddings.extend(batch_embeddings.tolist())
+                else:
+                    # Fallback to dummy embeddings
+                    for j, text in enumerate(batch):
+                        import random
+                        dummy_embedding = [random.uniform(-0.1, 0.1) for _ in range(384)]
+                        # Add variation based on text content
+                        text_hash = hash(text) % 1000
+                        for k in range(min(10, len(dummy_embedding))):
+                            dummy_embedding[k] += (text_hash / 10000.0) + ((i + j) / 1000.0)
+                        embeddings.append(dummy_embedding)
+                        
+            except Exception as e:
+                print(f"⚠️ Error generating embeddings for batch {batch_num}: {e}")
+                embedding_errors += len(batch)
+                # Add dummy embeddings for failed batch
+                for _ in batch:
+                    import random
+                    dummy_embedding = [random.uniform(-0.1, 0.1) for _ in range(384)]
+                    embeddings.append(dummy_embedding)
+        
+        return embeddings, embedding_errors
+        
+    except InterruptedError:
+        raise
+    except Exception as e:
+        st.warning(f"⚠️ Embedding generation failed: {e}")
+        # Fallback to all dummy embeddings
+        import random
+        embeddings = []
+        for i, text in enumerate(chunks):
+            dummy_embedding = [random.uniform(-0.1, 0.1) for _ in range(384)]
+            text_hash = hash(text) % 1000
+            for j in range(min(10, len(dummy_embedding))):
+                dummy_embedding[j] += (text_hash / 10000.0) + (i / 1000.0)
+            embeddings.append(dummy_embedding)
+        return embeddings, len(chunks)  # All failed
+
+
 def generate_real_embeddings(texts: List[str]) -> List[List[float]]:
     """Generate real embeddings using local sentence-transformers"""
     model = get_local_embedding_model()
@@ -345,7 +415,7 @@ def render_file_uploader() -> List:
     
     input_method = st.radio(
         "Choose input method:",
-        ["📄 Upload Files", "🌐 Single URL", "🚀 Bulk URLs"],
+        ["📄 Upload Files", "🚀 Bulk URLs"],
         key="input_method_radio",
         horizontal=True
     )
@@ -376,44 +446,9 @@ def render_file_uploader() -> List:
             - 📊 PowerPoint (.pptx)
             """)
     
-    elif input_method == "🌐 Single URL":
-        st.info("🔗 Extract content from a single web page in real-time")
-        st.info("Uses MCP server with Mozilla Readability for clean content extraction")
-        
-        # URL processing form
-        with st.form("web_url_form"):
-            url = st.text_input(
-                "Enter URL:",
-                placeholder="https://example.com/article",
-                help="Enter a web URL to extract and process its content"
-            )
-            
-            submitted = st.form_submit_button("🌐 Process URL", type="primary")
-            
-            if submitted and url:
-                process_web_url(url)
-        
-        # URL processing tips
-        with st.expander("💡 URL Processing Tips", expanded=False):
-            st.markdown("""
-            **How it works:**
-            - 🔧 **MCP Server**: Uses Mozilla Readability for clean extraction
-            - 🔄 **Fallback**: BeautifulSoup + requests if MCP server unavailable
-            - 📝 **Output**: Clean markdown content optimized for RAG
-            - ⚡ **Real-time**: Content processed and embedded immediately
-            
-            **Best URLs for processing:**
-            - ✅ Articles and blog posts
-            - ✅ Documentation pages
-            - ✅ News articles
-            - ✅ Wikipedia pages
-            - ❌ Dynamic content (JavaScript-heavy)
-            - ❌ Pages requiring authentication
-            """)
-    
     elif input_method == "🚀 Bulk URLs":
         st.info("🚀 Process multiple URLs at once for efficient bulk content extraction")
-        st.info("Supports text input and file uploads (.txt, .csv)")
+        st.info("Supports single URLs, multiple URLs, and file uploads (.txt, .csv)")
         
         # Call the bulk URL processing interface
         render_bulk_url_input()
@@ -492,6 +527,15 @@ def process_web_url(url: str):
                     # Show success message
                     st.success(f"✅ Successfully processed web content from {domain}")
                     
+                    # Show MCP server information
+                    if doc.get('extraction_method'):
+                        extraction_method = doc.get('extraction_method')
+                        method_map = {
+                            'mcp_just-every': '📦 Just-Every MCP'
+                        }
+                        method_display = method_map.get(extraction_method, extraction_method)
+                        st.info(f"🔧 **MCP Server Used:** {method_display}")
+                    
                     # Show processing stats
                     col1, col2, col3 = st.columns(3)
                     with col1:
@@ -539,6 +583,9 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
         st.error("No valid URLs found. Please provide URLs starting with http:// or https://")
         return
     
+    # Show processing start message
+    st.info(f"🚀 Starting bulk processing of {len(valid_urls)} URLs...")
+    
     # Initialize web content processor if not exists
     if 'web_content_processor' not in st.session_state:
         st.session_state.web_content_processor = WebContentProcessor()
@@ -569,8 +616,8 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
             status_text.text(f"Processing {i + 1}/{len(valid_urls)}: {url}")
             
             try:
-                # Extract content from URL
-                result = processor.process_url(url)
+                # Extract content from URL using silent mode to reduce alerts
+                result = processor.process_url(url, silent_mode=True)
                 
                 if result and result.get('success'):
                     # Create a document-like structure for web content
@@ -627,7 +674,8 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
                             'domain': domain,
                             'title': title,
                             'chunks': len(chunks),
-                            'size_mb': web_document['file_size_mb']
+                            'size_mb': web_document['file_size_mb'],
+                            'extraction_method': result.get('method', 'unknown')
                         })
                     else:
                         results['failed'].append({
@@ -656,8 +704,8 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
         progress_bar.empty()
         status_text.empty()
         
-        # Display results summary
-        st.markdown("### 📊 Bulk Processing Results")
+        # Display concise results summary
+        st.markdown("### 📊 Processing Complete")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -667,62 +715,77 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
         with col3:
             st.metric("🔄 Duplicates", len(results['duplicates']))
         with col4:
-            st.metric("📊 Total Processed", results['total_processed'])
+            st.metric("📊 Total", results['total_processed'])
         
-        # Show detailed results
-        if results['successful']:
-            st.markdown("#### ✅ Successfully Processed")
-            for item in results['successful']:
-                st.success(f"**{item['domain']}** - {item['title']} ({item['chunks']} chunks, {item['size_mb']:.2f} MB)")
-        
-        if results['failed']:
-            st.markdown("#### ❌ Failed to Process")
-            for item in results['failed']:
-                st.error(f"**{item['domain']}** - {item['reason']}")
-        
-        if results['duplicates']:
-            st.markdown("#### 🔄 Skipped (Already Exists)")
-            for item in results['duplicates']:
-                st.warning(f"**{item['domain']}** - {item['reason']}")
-        
-        # Show overall success message
+        # Show summary message
         if results['successful']:
             total_chunks = sum(item['chunks'] for item in results['successful'])
             total_size = sum(item['size_mb'] for item in results['successful'])
-            st.success(f"🎉 Successfully processed {len(results['successful'])} URLs with {total_chunks} total chunks ({total_size:.2f} MB)")
+            
+            # Determine primary extraction method
+            methods = [item.get('extraction_method', 'unknown') for item in results['successful']]
+            primary_method = max(set(methods), key=methods.count) if methods else 'unknown'
+            
+            method_display = {
+                'mcp_just-every': '📦 Just-Every MCP',
+                'requests_github_raw': '🔄 GitHub Raw Content',
+                'requests_beautifulsoup': '🔄 BeautifulSoup',
+                'requests_plain_text': '🔄 Direct HTTP'
+            }.get(primary_method, primary_method)
+            
+            st.success(f"🎉 Successfully processed {len(results['successful'])} URLs ({total_chunks} chunks, {total_size:.2f} MB)")
+            st.info(f"🔧 Primary method: {method_display}")
+        
+        # Show failures only if there are any
+        if results['failed']:
+            with st.expander(f"❌ {len(results['failed'])} URLs failed", expanded=False):
+                for item in results['failed'][:5]:  # Show first 5 failures
+                    st.error(f"**{item['domain']}** - {item['reason']}")
+                if len(results['failed']) > 5:
+                    st.caption(f"... and {len(results['failed']) - 5} more failures")
+        
+        # Show successful URLs with their extraction methods
+        if results['successful']:
+            with st.expander(f"✅ {len(results['successful'])} URLs processed successfully", expanded=False):
+                for item in results['successful']:
+                    method = item.get('extraction_method', 'unknown')
+                    method_display = {
+                        'mcp_just-every': '📦 Just-Every MCP',
+                        'requests_github_raw': '🔄 GitHub Raw Content',
+                        'requests_beautifulsoup': '🔄 BeautifulSoup',
+                        'requests_plain_text': '🔄 Direct HTTP'
+                    }.get(method, method)
+                    
+                    st.success(f"**{item['domain']}** - {item['title']} ({item['chunks']} chunks)")
+                    st.caption(f"🔧 Method: {method_display}")
+        
+        # Show duplicates only if there are any
+        if results['duplicates']:
+            with st.expander(f"🔄 {len(results['duplicates'])} URLs skipped (duplicates)", expanded=False):
+                for item in results['duplicates'][:5]:  # Show first 5 duplicates
+                    st.warning(f"**{item['domain']}** - {item['reason']}")
+                if len(results['duplicates']) > 5:
+                    st.caption(f"... and {len(results['duplicates']) - 5} more duplicates")
         
     except Exception as e:
+        st.error(f"❌ Bulk processing failed: {str(e)}")
         progress_bar.empty()
         status_text.empty()
-        st.error(f"❌ Error during bulk processing: {str(e)}")
 
 
 def render_bulk_url_input():
     """Render the bulk URL input interface"""
-    st.markdown("### 🌐 Bulk Web Content Extraction")
-    st.markdown("Process multiple URLs at once. Enter one URL per line:")
+    st.markdown("### 🌐 Web Content Extraction")
+    st.markdown("Process web URLs to extract content. Enter one URL per line (or just one URL for single processing):")
     
     # Text area for bulk URLs
     urls_text = st.text_area(
         "Enter URLs (one per line):",
-        placeholder="https://example.com\nhttps://docs.example.com\nhttps://blog.example.com\nhttps://news.example.com",
+        placeholder="https://github.com/username/repo/blob/main/README.md\nhttps://example.com\nhttps://docs.example.com",
         height=150,
-        help="Enter multiple URLs, one per line. URLs should start with http:// or https://",
+        help="Enter one or multiple URLs, one per line. URLs should start with http:// or https://",
         key="bulk_urls_text"
     )
-    
-    # Quick example button
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("📝 Load Example", help="Load sample URLs for testing"):
-            example_urls = """https://example.com
-https://docs.example.com
-https://blog.example.com
-https://news.example.com"""
-            st.session_state.bulk_urls_text = example_urls
-            st.rerun()
-    with col2:
-        st.caption("💡 Click to load example URLs for testing")
     
     # File upload option for bulk URLs
     st.markdown("**Or upload a text file with URLs:**")
@@ -793,12 +856,18 @@ https://news.example.com"""
     # Show processing tips
     with st.expander("💡 Processing Tips"):
         st.markdown("""
-        **Best Practices for Bulk URL Processing:**
+        **Best Practices for URL Processing:**
         
+        - **Single URL**: Just enter one URL for individual processing
+        - **Multiple URLs**: Enter multiple URLs, one per line
         - **URL Format**: Ensure URLs start with `http://` or `https://`
-        - **File Size**: Large files may take longer to process
         - **Rate Limiting**: Some websites may limit requests
         - **Content Quality**: Not all websites provide extractable content
+        
+        **GitHub URL Examples:**
+        - ✅ `https://github.com/kubeflow/trainer/blob/master/README.md`
+        - ✅ `https://github.com/username/repo-name` (auto-finds README.md)
+        - ✅ `https://github.com/username/repo/blob/main/docs/guide.md`
         
         **Supported File Formats:**
         - **Text files (.txt)**: One URL per line
@@ -1112,6 +1181,34 @@ def render_document_library() -> None:
             # Quick stats
             st.info(f"📊 {doc_count} documents • {total_size_mb:.1f}MB total • {total_chunks} chunks")
             
+            # Search and filter options
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                search_term = st.text_input("🔍 Search documents", placeholder="Search by name, content, or URL...", key="doc_search")
+            with col2:
+                filter_type = st.selectbox("📁 Filter by type", ["All", "WEB", "PDF", "TXT", "DOCX"], key="doc_filter")
+            
+            # Filter documents based on search and filter
+            filtered_documents = all_documents
+            if search_term:
+                search_lower = search_term.lower()
+                filtered_documents = [
+                    doc for doc in filtered_documents
+                    if (search_lower in doc.get('name', '').lower() or
+                        search_lower in doc.get('content', '').lower() or
+                        search_lower in doc.get('source_url', '').lower())
+                ]
+            
+            if filter_type != "All":
+                filtered_documents = [
+                    doc for doc in filtered_documents
+                    if doc.get('file_type') == filter_type
+                ]
+            
+            # Show filtered count
+            if len(filtered_documents) != len(all_documents):
+                st.info(f"🔍 Showing {len(filtered_documents)} of {len(all_documents)} documents")
+            
             # Embedding Quality Summary
             real_embeddings = sum(doc.get('chunk_count', 0) - doc.get('embedding_errors', 0) for doc in all_documents)
             total_embeddings = sum(doc.get('chunk_count', 0) for doc in all_documents)
@@ -1235,14 +1332,97 @@ def render_document_library() -> None:
                     )
             
             # Simple document list
-            for i, doc in enumerate(all_documents):
+            for i, doc in enumerate(filtered_documents):
                 with st.expander(f"📄 {doc['name']}", expanded=False):
-                    st.write(f"**Size:** {doc.get('file_size_mb', 0):.2f} MB")
-                    st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
-                    if st.button(f"🗑️ Remove", key=f"remove_{i}"):
-                        remove_document(i)
-                        st.rerun()
-            
+                    # Basic document info
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.write(f"**Size:** {doc.get('file_size_mb', 0):.2f} MB")
+                        st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
+                        st.write(f"**Characters:** {len(doc.get('content', '')):,}")
+                    
+                    with col2:
+                        # Show MCP server information
+                        if doc.get('extraction_method'):
+                            extraction_method = doc.get('extraction_method')
+                            method_map = {
+                                'mcp_just-every': '📦 Just-Every MCP'
+                            }
+                            method_display = method_map.get(extraction_method, extraction_method)
+                            st.info(f"🔧 **MCP Server Used:** {method_display}")
+                            
+                            # Show source URL
+                            if doc.get('source_url'):
+                                st.write(f"**🔗 Source:** {doc.get('source_url')}")
+                        
+                        # Show content preview
+                        content = doc.get('content', '')
+                        if content:
+                            preview = content[:200].replace('\n', ' ').strip()
+                            if len(content) > 200:
+                                preview += "..."
+                            st.caption(f"**Preview:** {preview}")
+                    
+                    # Action buttons
+                    col1, col2, col3 = st.columns([1, 1, 1])
+                    with col1:
+                        if st.button(f"👁️ View Content", key=f"view_{i}"):
+                            st.session_state[f"show_content_{i}"] = not st.session_state.get(f"show_content_{i}", False)
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button(f"📊 View Chunks", key=f"chunks_{i}"):
+                            st.session_state[f"show_chunks_{i}"] = not st.session_state.get(f"show_chunks_{i}", False)
+                            st.rerun()
+                    
+                    with col3:
+                        if st.button(f"🗑️ Remove", key=f"remove_{i}"):
+                            remove_document(i)
+                            st.rerun()
+                    
+                    # Show content if requested
+                    if st.session_state.get(f"show_content_{i}", False):
+                        st.markdown("---")
+                        st.markdown("### 📄 Raw Extracted Content")
+                        
+                        # Show extraction method and statistics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Method", doc.get('extraction_method', 'unknown'))
+                        with col2:
+                            st.metric("Characters", f"{len(doc.get('content', '')):,}")
+                        with col3:
+                            st.metric("Chunks", doc.get('chunk_count', 0))
+                        
+                        # Show additional metadata for web documents
+                        if doc.get('file_type') == 'WEB':
+                            if doc.get('source_url'):
+                                st.info(f"**Source:** {doc.get('source_url')}")
+                            if doc.get('metadata'):
+                                with st.expander("📊 Extraction Metadata", expanded=False):
+                                    st.json(doc.get('metadata', {}))
+                        
+                        # Show content in a scrollable area
+                        content = doc.get('content', '')
+                        if len(content) > 5000:
+                            st.markdown("**Content Preview (first 5000 characters):**")
+                            st.text_area("Raw Content", content[:5000], height=300, key=f"content_preview_{i}")
+                            st.info(f"Content truncated. Full content has {len(content):,} characters.")
+                        else:
+                            st.text_area("Raw Content", content, height=300, key=f"content_full_{i}")
+                    
+                    # Show chunks if requested
+                    if st.session_state.get(f"show_chunks_{i}", False):
+                        st.markdown("---")
+                        st.markdown("### 🧩 Document Chunks")
+                        chunks = doc.get('chunks', [])
+                        if chunks:
+                            for j, chunk in enumerate(chunks):
+                                with st.expander(f"Chunk {j+1} ({len(chunk)} chars)", expanded=False):
+                                    st.text(chunk)
+                        else:
+                            st.info("No chunks available for this document.")
+        
         else:
             st.info("🔍 No documents uploaded yet. Upload some documents above to get started!")
 
@@ -1300,269 +1480,4 @@ def get_document_count() -> int:
     """Get the total number of uploaded documents"""
     if 'uploaded_documents' in st.session_state:
         return len(st.session_state.uploaded_documents) 
-    return 0
-
-
-def try_basic_extraction(uploaded_file, file_extension: str) -> str:
-    """Simplified extraction - recommend docling for all complex formats"""
-    return f"""Content from {uploaded_file.name} ({file_extension.upper()} format)
-
-📋 To extract content from this file, install docling:
-   pip install docling[all]
-
-Then restart the app. Docling provides advanced AI-powered document extraction for PDF, DOCX, PPTX and more."""
-
-
-def extract_file_content(uploaded_file) -> str:
-    """Extract text content from uploaded file using docling only"""
-    file_extension = uploaded_file.name.split('.')[-1].lower()
-    
-    try:
-        if file_extension in ['txt', 'md']:
-            # Text and markdown files - direct reading
-            content = str(uploaded_file.read(), "utf-8")
-            uploaded_file.seek(0)  # Reset file pointer
-            return content
-            
-        elif file_extension in ['pdf', 'docx', 'pptx']:
-            # Use docling for PDF, DOCX, PPTX files
-            try:
-                from docling.document_converter import DocumentConverter
-                from docling.datamodel.base_models import InputFormat
-                import tempfile
-                import os
-                
-                # Save uploaded file to temporary location
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as tmp_file:
-                    tmp_file.write(uploaded_file.read())
-                    tmp_path = tmp_file.name
-                    uploaded_file.seek(0)  # Reset file pointer
-                
-                try:
-                    # Initialize docling converter
-                    converter = DocumentConverter()
-                    
-                    # Convert document
-                    result = converter.convert(tmp_path)
-                    
-                    # Extract text content
-                    if result.document and result.document.body:
-                        # Get the full text content
-                        content = result.document.export_to_markdown()
-                        return content.strip() if content else f"Content extracted from {uploaded_file.name} but appears empty"
-                    else:
-                        return f"Content from {uploaded_file.name} (docling extraction returned empty result)"
-                        
-                finally:
-                    # Clean up temporary file
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                        
-            except ImportError:
-                # If docling not available, recommend installation
-                return try_basic_extraction(uploaded_file, file_extension)
-            except Exception as e:
-                return f"Content from {uploaded_file.name} (docling extraction failed: {str(e)})"
-        
-        else:
-            # Unsupported file type
-            return f"Content from {uploaded_file.name} ({file_extension.upper()} extraction not supported)"
-            
-    except Exception as e:
-        return f"Content from {uploaded_file.name} (error: {str(e)})"
-
-
-def create_text_chunks(text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
-    """Split text into overlapping chunks with improved context preservation"""
-    # Use config defaults if not specified
-    if chunk_size is None:
-        from .config import CHARS_PER_CHUNK
-        chunk_size = CHARS_PER_CHUNK
-    if overlap is None:
-        from .config import CHUNK_OVERLAP
-        overlap = CHUNK_OVERLAP
-    
-    if not text or len(text.strip()) == 0:
-        return ["No content available"]
-    
-    # Clean the text
-    text = text.strip()
-    
-    # If text is shorter than chunk size, return as single chunk
-    if len(text) <= chunk_size:
-        return [text]
-    
-    chunks = []
-    start = 0
-    
-    while start < len(text):
-        # Calculate end position
-        end = start + chunk_size
-        
-        # If this is not the last chunk, try to break at logical boundaries
-        if end < len(text):
-            # Look for paragraph boundary first (double newline)
-            para_break = text.rfind('\n\n', start, end)
-            if para_break > start + chunk_size // 3:  # Must be at least 1/3 into chunk
-                end = para_break + 2
-            else:
-                # Look for sentence boundary (. ! ?)
-                sentence_break = max(
-                    text.rfind('. ', start, end),
-                    text.rfind('! ', start, end),
-                    text.rfind('? ', start, end)
-                )
-                
-                if sentence_break > start + chunk_size // 2:  # Must be at least halfway
-                    end = sentence_break + 1
-                else:
-                    # Look for word boundary as last resort
-                    word_break = text.rfind(' ', start, end)
-                    if word_break > start + chunk_size // 2:
-                        end = word_break
-        
-        # Extract chunk
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        
-        # Move start position with overlap (but ensure we make progress)
-        start = max(start + 1, end - overlap)
-        
-        # Prevent infinite loop
-        if start >= len(text):
-            break
-    
-    return chunks if chunks else ["No content available"] 
-
-
-def optimize_chunks_for_large_files(chunks: List[str]) -> List[str]:
-    """Optimize chunks for large files by merging small ones and filtering low-content chunks"""
-    if len(chunks) <= 50:
-        return chunks
-    
-    optimized_chunks = []
-    current_chunk = ""
-    min_chunk_size = 1500  # Larger minimum size for efficiency
-    max_chunk_size = 4000  # Larger maximum size
-    
-    for chunk in chunks:
-        # Skip very small or low-content chunks
-        if len(chunk.strip()) < 100 or chunk.strip().count(' ') < 10:
-            continue
-            
-        # Try to merge with current chunk if it won't exceed max size
-        if len(current_chunk) + len(chunk) < max_chunk_size:
-            current_chunk = (current_chunk + "\n\n" + chunk).strip()
-        else:
-            # Add current chunk if it meets minimum size
-            if len(current_chunk) >= min_chunk_size:
-                optimized_chunks.append(current_chunk)
-            current_chunk = chunk
-    
-    # Add final chunk
-    if len(current_chunk) >= min_chunk_size:
-        optimized_chunks.append(current_chunk)
-    
-    print(f"🚀 Optimized {len(chunks)} chunks down to {len(optimized_chunks)} chunks")
-    return optimized_chunks
-
-
-# Add custom exception for interrupted uploads
-class InterruptedError(Exception):
-    """Custom exception for interrupted file uploads"""
-    pass
-
-
-def generate_embeddings_batch_optimized(
-    chunks: List[str], 
-    progress_bar, 
-    status_text, 
-    start_progress: float = 0.5,
-    file_id: str = None
-) -> tuple[List[List[float]], int]:
-    """Generate embeddings with optimized batching and progress tracking"""
-    embeddings = []
-    embedding_errors = 0
-    total_chunks = len(chunks)
-    
-    # Determine batch size based on chunk count
-    if total_chunks > 50:
-        batch_size = 10  # Larger batches for many chunks
-    elif total_chunks > 20:
-        batch_size = 5   # Medium batches
-    else:
-        batch_size = 3   # Small batches for few chunks
-    
-    progress_range = 0.4  # 40% of progress bar for embeddings
-    
-    # Process in batches
-    for i in range(0, total_chunks, batch_size):
-        batch_chunks = chunks[i:i + batch_size]
-        batch_num = (i // batch_size) + 1
-        total_batches = (total_chunks + batch_size - 1) // batch_size
-        
-        status_text.text(f"🧠 Processing batch {batch_num}/{total_batches} ({len(batch_chunks)} chunks)...")
-        
-        # Check for interruption during batch processing
-        if file_id and file_id not in st.session_state.currently_uploading:
-            st.session_state.upload_interrupted = True
-            raise InterruptedError(f"Upload interrupted during embedding generation")
-        
-        # Try batch processing first (if supported)
-        batch_embeddings = try_batch_embedding_generation(batch_chunks)
-        
-        if batch_embeddings:
-            embeddings.extend(batch_embeddings)
-        else:
-            # Fallback to individual processing for this batch
-            for j, chunk in enumerate(batch_chunks):
-                try:
-                    embedding = st.session_state.llamastack_client.get_embeddings(chunk, model="all-MiniLM-L6-v2")
-                    if embedding and len(embedding) > 100:  # Validate real embedding
-                        embeddings.append(embedding)
-                    else:
-                        # Generate efficient dummy embedding
-                        embeddings.append(generate_efficient_dummy_embedding(chunk))
-                        embedding_errors += 1
-                except Exception as e:
-                    print(f"Embedding error for chunk {i+j}: {e}")
-                    embeddings.append(generate_efficient_dummy_embedding(chunk))
-                    embedding_errors += 1
-        
-        # Update progress less frequently for better performance
-        batch_progress = start_progress + (progress_range * (i + len(batch_chunks)) / total_chunks)
-        progress_bar.progress(min(batch_progress, 0.9))
-    
-    print(f"✅ Generated {len(embeddings)} embeddings with {embedding_errors} errors")
-    return embeddings, embedding_errors
-
-
-def try_batch_embedding_generation(chunks: List[str]) -> List[List[float]]:
-    """Try to generate embeddings in batch if possible"""
-    try:
-        # This would be implemented if LlamaStack supports batch embeddings
-        # For now, return None to fallback to individual processing
-        return None
-    except Exception:
-        return None
-
-
-def generate_efficient_dummy_embedding(text: str) -> List[float]:
-    """Generate varied dummy embedding efficiently"""
-    import hashlib
-    
-    # Create deterministic but varied embedding based on text content
-    text_hash = hashlib.md5(text.encode()).hexdigest()
-    
-    # Convert hash to numeric seed
-    seed_value = int(text_hash[:8], 16)
-    
-    # Generate 384-dimensional embedding efficiently
-    embedding = []
-    for i in range(384):
-        # Use simple math instead of random for efficiency
-        value = ((seed_value + i * 17) % 1000 - 500) / 5000.0  # Range: -0.1 to 0.1
-        embedding.append(value)
-    
-    return embedding 
+    return 0 

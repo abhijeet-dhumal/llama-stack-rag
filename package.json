@@ -5,13 +5,16 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "mcp-version": "npx @just-every/mcp-read-website-fast --version"
+    "mcp-version": "npx @just-every/mcp-read-website-fast --version",
+    "test-just-every": "npx @just-every/mcp-read-website-fast --version"
   },
   "keywords": [
     "mcp",
     "web-extraction",
     "rag",
-    "llama-stack"
+    "llama-stack",
+    "just-every",
+    "free-mcp"
   ],
   "author": "RAG LlamaStack",
   "license": "MIT",

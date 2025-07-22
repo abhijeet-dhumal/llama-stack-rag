@@ -42,35 +42,188 @@ def render_faiss_dashboard():
     with tab4:
         render_faiss_management(faiss_db_path)
 
+def get_faiss_index_stats() -> Dict[str, Any]:
+    """Get actual FAISS index statistics by reading the index file"""
+    try:
+        import faiss
+        import pickle
+        
+        faiss_dir = os.path.join("data", "faiss")
+        index_path = os.path.join(faiss_dir, "faiss_index_global.faiss")
+        
+        if not os.path.exists(index_path):
+            return {"error": "FAISS index file not found"}
+        
+        # Load the FAISS index
+        index = faiss.read_index(index_path)
+        
+        # Get index statistics
+        stats = {
+            "index_type": type(index).__name__,
+            "total_vectors": index.ntotal,
+            "vector_dimension": index.d,
+            "is_trained": index.is_trained,
+            "index_size_bytes": os.path.getsize(index_path)
+        }
+        
+        # Try to load additional metadata
+        chunks_path = os.path.join(faiss_dir, "faiss_chunks_global.pkl")
+        if os.path.exists(chunks_path):
+            try:
+                with open(chunks_path, 'rb') as f:
+                    chunks = pickle.load(f)
+                stats["chunks_count"] = len(chunks) if chunks else 0
+            except:
+                stats["chunks_count"] = "Error loading"
+        
+        documents_path = os.path.join(faiss_dir, "faiss_documents_global.pkl")
+        if os.path.exists(documents_path):
+            try:
+                with open(documents_path, 'rb') as f:
+                    documents = pickle.load(f)
+                stats["documents_count"] = len(documents) if documents else 0
+            except:
+                stats["documents_count"] = "Error loading"
+        
+        return stats
+        
+    except Exception as e:
+        return {"error": f"Failed to read FAISS index: {str(e)}"}
+
+
 def render_faiss_overview(faiss_db_path: str):
     """Render FAISS database overview"""
     st.markdown("#### 📊 Database Overview")
     
-    # Get database stats
-    file_size = os.path.getsize(faiss_db_path) / (1024 * 1024)  # MB
+    # Calculate total database size including all FAISS-related files
+    faiss_data_path = os.path.dirname(faiss_db_path)
+    faiss_dir = os.path.join("data", "faiss")  # Additional FAISS directory
+    total_size = 0
+    file_count = 0
+    
+    # Sum up all files in the vectors directory
+    if os.path.exists(faiss_data_path):
+        for filename in os.listdir(faiss_data_path):
+            file_path = os.path.join(faiss_data_path, filename)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+                file_count += 1
+    
+    # Sum up all files in the faiss directory
+    if os.path.exists(faiss_dir):
+        for filename in os.listdir(faiss_dir):
+            file_path = os.path.join(faiss_dir, filename)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+                file_count += 1
+    
+    file_size_mb = total_size / (1024 * 1024)  # MB
     modified_time = datetime.fromtimestamp(os.path.getmtime(faiss_db_path))
     
     # Try to get vector count from session state or estimate
     total_vectors = 0
+    uploaded_docs_count = 0
+    old_docs_count = 0
+    
     if 'uploaded_documents' in st.session_state:
+        uploaded_docs_count = len(st.session_state.uploaded_documents)
         total_vectors = sum(doc.get('chunk_count', 0) for doc in st.session_state.uploaded_documents)
+    
+    # Also check if there are any documents in the old format
+    if 'documents' in st.session_state:
+        old_docs_count = len(st.session_state.documents)
+        total_vectors += sum(doc.get('chunk_count', 0) for doc in st.session_state.documents)
+    
+    # Get actual FAISS index statistics
+    faiss_stats = get_faiss_index_stats()
+    actual_vectors = faiss_stats.get('total_vectors', 0) if 'error' not in faiss_stats else 0
+    
+    # Use actual FAISS vectors if available, otherwise fall back to session state
+    if actual_vectors > 0:
+        total_vectors = actual_vectors
+    
+    # Debug information
+    st.markdown("#### 🔍 Debug Information")
+    debug_info = {
+        "Uploaded Documents": uploaded_docs_count,
+        "Old Documents": old_docs_count,
+        "Total Documents": uploaded_docs_count + old_docs_count,
+        "Session State Vectors": sum(doc.get('chunk_count', 0) for doc in st.session_state.get('uploaded_documents', [])) + sum(doc.get('chunk_count', 0) for doc in st.session_state.get('documents', [])),
+        "FAISS Index Vectors": actual_vectors,
+        "Total Vectors (Used)": total_vectors,
+        "FAISS Files Found": file_count,
+        "Total FAISS Size (MB)": f"{file_size_mb:.3f}"
+    }
+    
+    debug_df = pd.DataFrame([debug_info])
+    st.dataframe(debug_df, use_container_width=True, hide_index=True)
+    
+    # Show FAISS index details if available
+    if 'error' not in faiss_stats:
+        st.markdown("#### 🧠 FAISS Index Details")
+        index_info = {
+            "Index Type": faiss_stats.get('index_type', 'Unknown'),
+            "Vector Dimension": faiss_stats.get('vector_dimension', 'Unknown'),
+            "Total Vectors": faiss_stats.get('total_vectors', 0),
+            "Is Trained": "Yes" if faiss_stats.get('is_trained', False) else "No",
+            "Index Size (MB)": f"{faiss_stats.get('index_size_bytes', 0) / (1024 * 1024):.3f}",
+            "Chunks Count": faiss_stats.get('chunks_count', 'Unknown'),
+            "Documents Count": faiss_stats.get('documents_count', 'Unknown')
+        }
+        
+        index_df = pd.DataFrame([index_info])
+        st.dataframe(index_df, use_container_width=True, hide_index=True)
+    else:
+        st.warning(f"⚠️ Could not read FAISS index: {faiss_stats['error']}")
+    
+    # Show document details if available
+    if uploaded_docs_count > 0 or old_docs_count > 0:
+        st.markdown("#### 📋 Document Details")
+        doc_details = []
+        
+        if 'uploaded_documents' in st.session_state:
+            for i, doc in enumerate(st.session_state.uploaded_documents):
+                doc_details.append({
+                    "Type": "Uploaded",
+                    "Index": i,
+                    "Name": doc.get('name', 'Unknown'),
+                    "Chunks": doc.get('chunk_count', 0),
+                    "Size (MB)": doc.get('file_size_mb', 0),
+                    "Has Embeddings": "Yes" if doc.get('chunk_count', 0) > 0 else "No"
+                })
+        
+        if 'documents' in st.session_state:
+            for i, doc in enumerate(st.session_state.documents):
+                doc_details.append({
+                    "Type": "Legacy",
+                    "Index": i,
+                    "Name": doc.get('name', 'Unknown'),
+                    "Chunks": doc.get('chunk_count', 0),
+                    "Size (MB)": doc.get('file_size_mb', 0),
+                    "Has Embeddings": "Yes" if doc.get('chunk_count', 0) > 0 else "No"
+                })
+        
+        if doc_details:
+            details_df = pd.DataFrame(doc_details)
+            st.dataframe(details_df, use_container_width=True, hide_index=True)
     
     # Display metrics
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("📁 Database Files", 1)
+        st.metric("📁 Database Files", file_count)
     with col2:
         st.metric("🧠 Total Vectors", f"{total_vectors:,}")
     with col3:
-        st.metric("💾 Database Size", f"{file_size:.1f} MB")
+        st.metric("💾 Database Size", f"{file_size_mb:.2f} MB")
     with col4:
-        st.metric("📊 Vectors/MB", f"{total_vectors/file_size:.0f}" if file_size > 0 else "0")
+        st.metric("📊 Vectors/MB", f"{total_vectors/file_size_mb:.0f}" if file_size_mb > 0 else "0")
     
     # Database info
     st.markdown("#### 📋 Database Information")
     db_info = {
         "Database File": "faiss_store.db",
-        "Size (MB)": f"{file_size:.2f}",
+        "Size (MB)": f"{file_size_mb:.2f}",
+        "Files": file_count,
         "Vectors": f"{total_vectors:,}",
         "Modified": modified_time.strftime("%Y-%m-%d %H:%M"),
         "Status": "🟢 Active" if total_vectors > 0 else "🟡 Empty"
@@ -79,6 +232,41 @@ def render_faiss_overview(faiss_db_path: str):
     # Display as dataframe
     df = pd.DataFrame([db_info])
     st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # Show file breakdown
+    if file_count > 1:
+        st.markdown("#### 📁 File Breakdown")
+        file_breakdown = []
+        
+        # Add files from vectors directory
+        if os.path.exists(faiss_data_path):
+            for filename in os.listdir(faiss_data_path):
+                file_path = os.path.join(faiss_data_path, filename)
+                if os.path.isfile(file_path):
+                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    file_breakdown.append({
+                        "Directory": "vectors",
+                        "File": filename,
+                        "Size (MB)": f"{size_mb:.3f}",
+                        "Size (Bytes)": f"{os.path.getsize(file_path):,}"
+                    })
+        
+        # Add files from faiss directory
+        if os.path.exists(faiss_dir):
+            for filename in os.listdir(faiss_dir):
+                file_path = os.path.join(faiss_dir, filename)
+                if os.path.isfile(file_path):
+                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    file_breakdown.append({
+                        "Directory": "faiss",
+                        "File": filename,
+                        "Size (MB)": f"{size_mb:.3f}",
+                        "Size (Bytes)": f"{os.path.getsize(file_path):,}"
+                    })
+        
+        if file_breakdown:
+            file_df = pd.DataFrame(file_breakdown)
+            st.dataframe(file_df, use_container_width=True, hide_index=True)
     
     # Document summary if available
     if 'uploaded_documents' in st.session_state and st.session_state.uploaded_documents:

@@ -799,23 +799,57 @@ def render_sidebar():
             col3, col4 = st.columns(2)
             
             with col3:
-                if st.button("🌐 Test MCP Server", help="Check if MCP server is available for web content processing"):
-                    with st.spinner("Testing MCP Server..."):
+                if st.button("🌐 Test MCP Servers", help="Check which MCP servers are available for web content processing"):
+                    with st.spinner("Testing MCP Servers..."):
                         try:
                             import subprocess
-                            result = subprocess.run(
-                                ["npx", "@just-every/mcp-read-website-fast", "--version"],
-                                capture_output=True,
-                                text=True,
-                                timeout=10
-                            )
                             
-                            if result.returncode == 0:
-                                st.success("✅ MCP Server available")
-                                st.info("🔧 Web content extraction will use MCP server for optimal quality")
+                            # Test all MCP servers
+                            mcp_servers = [
+                                {
+                                    'name': 'Just-Every MCP',
+                                    'command': ['npx', '@just-every/mcp-read-website-fast', '--version'],
+                                    'description': '📦 Reliable markdown extraction (no API key required)'
+                                }
+                            ]
+                            
+                            available_servers = []
+                            for server in mcp_servers:
+                                try:
+                                    # All servers are free (no API keys required)
+                                    
+                                    result = subprocess.run(
+                                        server['command'],
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=5
+                                    )
+                                    if result.returncode == 0:
+                                        available_servers.append(f"✅ {server['name']} - {server['description']}")
+                                    else:
+                                        available_servers.append(f"❌ {server['name']} - Not available")
+                                except Exception:
+                                    available_servers.append(f"❌ {server['name']} - Not installed")
+                            
+                            if any("✅" in server for server in available_servers):
+                                st.success("✅ MCP Servers Available")
+                                st.info("🔧 Web content extraction will use the best available MCP server")
+                                
+                                # Show available servers
+                                st.markdown("**Available MCP Servers:**")
+                                for server in available_servers:
+                                    if "✅" in server:
+                                        st.success(server)
+                                    else:
+                                        st.warning(server)
+                                
+                                # Show priority order
+                                st.info("📊 **Priority Order:** Just-Every MCP → BeautifulSoup")
                             else:
-                                st.warning("⚠️ MCP Server not available")
-                                st.info("🔄 Web content extraction will use fallback method")
+                                st.warning("⚠️ No MCP servers available")
+                                st.info("🔄 Web content extraction will use BeautifulSoup fallback")
+                                st.info("💡 Install MCP servers: `make setup-mcp`")
+                                
                         except Exception as e:
                             st.warning("⚠️ MCP Server check failed")
                             st.info("🔄 Fallback method will be used automatically")
@@ -848,17 +882,27 @@ def render_sidebar():
             st.markdown("---")
             st.markdown("**🐛 Debug Information**")
             
-            if st.button("📋 Show Debug Info", help="Display current configuration and state"):
-                debug_info = {
-                    "LlamaStack URL": st.session_state.llamastack_client.base_url,
-                    "Selected LLM": st.session_state.selected_llm_model,
-                    "Selected Embedding": st.session_state.selected_embedding_model,
-                    "Documents Loaded": len(st.session_state.uploaded_documents) if 'uploaded_documents' in st.session_state else 0,
-                    "Chat History": len(st.session_state.chat_history) if 'chat_history' in st.session_state else 0,
-                    "Web Processor Available": 'web_content_processor' in st.session_state
-                }
+            # Quick MCP Server Status
+            st.markdown("**🔧 MCP Server Status**")
+            try:
+                import subprocess
                 
-                st.json(debug_info)
+                # Quick check for Just-Every MCP (primary)
+                result = subprocess.run(
+                    ['npx', '@just-every/mcp-read-website-fast', '--version'],
+                    capture_output=True,
+                    text=True,
+                    timeout=3
+                )
+                if result.returncode == 0:
+                    st.success("✅ Just-Every MCP (Primary)")
+                else:
+                    st.warning("⚠️ Just-Every MCP (Not available)")
+                    
+            except Exception:
+                st.warning("⚠️ MCP Server check failed")
+            
+            st.caption("💡 Click 'Test MCP Servers' for detailed status")
 
 
 if __name__ == "__main__":

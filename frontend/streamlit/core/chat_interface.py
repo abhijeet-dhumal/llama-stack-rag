@@ -4,6 +4,7 @@ Handles chat functionality, welcome screen, and user interactions
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import html
 from typing import List, Dict, Any
 from .utils import cosine_similarity, get_context_type
@@ -94,7 +95,7 @@ def render_welcome_screen() -> None:
 
 def render_chat_interface() -> None:
     """Display the main chat interface with proper chat layout"""
-    # Clean chat styling
+    # Clean chat styling - use st.markdown with unsafe_allow_html=True
     st.markdown("""
     <style>
     .chat-container {
@@ -103,6 +104,8 @@ def render_chat_interface() -> None:
         padding: 1rem;
         border-radius: 10px;
         margin-bottom: 1rem;
+        background-color: var(--background-color, #ffffff);
+        border: 1px solid var(--border-color, #e9ecef);
     }
     
     .user-message {
@@ -129,7 +132,7 @@ def render_chat_interface() -> None:
     
     .user-bubble {
         background: linear-gradient(135deg, #007bff, #0056b3);
-        background-color: #007bff; /* Fallback */
+        background-color: #007bff;
         color: white !important;
         border-bottom-right-radius: 4px;
         font-weight: 500;
@@ -151,9 +154,9 @@ def render_chat_interface() -> None:
     }
     
     .assistant-bubble {
-        background: var(--background-color, #f8f9fa);
+        background: var(--secondary-background, #f8f9fa);
         border: 1px solid var(--border-color, #e9ecef);
-        color: var(--text-color, #333);
+        color: var(--text-color, #262730);
         border-bottom-left-radius: 4px;
     }
     
@@ -161,25 +164,39 @@ def render_chat_interface() -> None:
         margin-top: 0.5rem;
         font-size: 0.75em;
         opacity: 0.7;
+        color: var(--secondary-text, #666666);
     }
     
     .source-tag {
         display: inline-block;
-        background: var(--secondary-background, #e9ecef);
-        padding: 0.2rem 0.4rem;
-        border-radius: 8px;
-        margin-right: 0.3rem;
-        margin-bottom: 0.2rem;
-        font-size: 0.7em;
+        background: var(--primary-color, #ff4b4b);
+        color: white;
+        padding: 0.3rem 0.6rem;
+        border-radius: 12px;
+        margin-right: 0.4rem;
+        margin-bottom: 0.3rem;
+        font-size: 0.75em;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: none;
+    }
+    
+    .source-tag:hover {
+        background: #ff6b6b !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
     .model-info {
         margin-top: 0.4rem;
         padding: 0.3rem 0.5rem;
-        background: var(--info-background, #f8f9fa);
+        background: var(--secondary-background, #f8f9fa);
         border-radius: 6px;
         font-size: 0.7em;
         border-left: 3px solid var(--info-color, #17a2b8);
+        color: var(--secondary-text, #666666);
     }
     
     /* Improve input field readability */
@@ -214,6 +231,42 @@ def render_chat_interface() -> None:
     
     # Chat history display
     if st.session_state.chat_history:
+        # Prepare document content for JavaScript
+        document_contents = {}
+        source_relevances = {}
+        
+        for message in st.session_state.chat_history:
+            if message['role'] == 'assistant' and 'sources' in message:
+                for i, source in enumerate(message['sources']):
+                    doc_name = source['document']
+                    source_relevances[i] = source['score'] * 100
+                    
+                    # Get document content from session state
+                    all_documents = []
+                    if 'documents' in st.session_state:
+                        all_documents.extend(st.session_state.documents)
+                    if 'uploaded_documents' in st.session_state:
+                        all_documents.extend(st.session_state.uploaded_documents)
+                    
+                    # Find the document and get its content
+                    for doc in all_documents:
+                        if doc.get('name') == doc_name:
+                            content = doc.get('content', 'Content not available')
+                            # Truncate for modal display
+                            if len(content) > 2000:
+                                content = content[:2000] + "...\n\n[Content truncated for display]"
+                            document_contents[doc_name] = content
+                            break
+        
+        # Inject document content into JavaScript
+        if document_contents:
+            st.markdown(f"""
+            <script>
+            window.documentContents = {document_contents};
+            window.sourceRelevances = {source_relevances};
+            </script>
+            """, unsafe_allow_html=True)
+        
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
         
         for message in st.session_state.chat_history:
@@ -235,13 +288,14 @@ def render_chat_interface() -> None:
                 # Build metadata sections
                 metadata_html = ""
                 
-                # Sources
+                # Sources with clickable links
                 if 'sources' in message and message['sources']:
                     sources_html = ""
-                    for source in message['sources']:
+                    for i, source in enumerate(message['sources']):
                         relevance_pct = source["score"] * 100
                         escaped_doc_name = html.escape(source["document"])
-                        sources_html += f'<span class="source-tag">📄 {escaped_doc_name} ({relevance_pct:.1f}%)</span>'
+                        # Create clickable link for document preview with better styling
+                        sources_html += f'<button class="source-tag" onclick="showDocumentPreview(\'{escaped_doc_name}\', {i})">📄 {escaped_doc_name} ({relevance_pct:.1f}%)</button>'
                     metadata_html += f'<div class="message-metadata">{sources_html}</div>'
                 
                 # Model info (simplified)
@@ -259,24 +313,190 @@ def render_chat_interface() -> None:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Add Streamlit-based document preview as separate expandable block after the message
+                if 'sources' in message and message['sources']:
+                    with st.expander("📄 View Source Documents", expanded=False):
+                        for i, source in enumerate(message['sources']):
+                            doc_name = source['document']
+                            relevance_pct = source['score'] * 100
+                            
+                            # Find document content
+                            all_documents = []
+                            if 'documents' in st.session_state:
+                                all_documents.extend(st.session_state.documents)
+                            if 'uploaded_documents' in st.session_state:
+                                all_documents.extend(st.session_state.uploaded_documents)
+                            
+                            doc_content = "Content not available"
+                            for doc in all_documents:
+                                if doc.get('name') == doc_name:
+                                    doc_content = doc.get('content', 'Content not available')
+                                    break
+                            
+                            with st.expander(f"📄 {doc_name} (Relevance: {relevance_pct:.1f}%)", expanded=False):
+                                st.markdown(f"**Source:** {doc_name}")
+                                st.markdown(f"**Relevance:** {relevance_pct:.1f}%")
+                                
+                                # Show document metadata
+                                for doc in all_documents:
+                                    if doc.get('name') == doc_name:
+                                        if doc.get('file_type'):
+                                            st.markdown(f"**Type:** {doc.get('file_type')}")
+                                        if doc.get('extraction_method'):
+                                            method_map = {
+                                                'requests_github_raw': '🔄 GitHub Raw',
+                                                'requests_beautifulsoup': '🔄 BeautifulSoup',
+                                                'requests_plain_text': '🔄 Direct HTTP',
+                                                'mcp_just-every': '📦 Just-Every MCP'
+                                            }
+                                            method_display = method_map.get(doc.get('extraction_method'), doc.get('extraction_method'))
+                                            st.markdown(f"**Method:** {method_display}")
+                                        if doc.get('source_url'):
+                                            st.markdown(f"**URL:** {doc.get('source_url')}")
+                                        break
+                                
+                                st.markdown("---")
+                                # Use a unique counter-based key to avoid duplicates
+                                if 'doc_preview_counter' not in st.session_state:
+                                    st.session_state.doc_preview_counter = 0
+                                st.session_state.doc_preview_counter += 1
+                                unique_key = f"doc_preview_{st.session_state.doc_preview_counter}"
+                                st.text_area("Content", doc_content, height=200, key=unique_key)
         
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Add JavaScript for document preview functionality - use components.html to avoid display issues
+    
+    # Create the JavaScript component
+    js_code = """
+    <script>
+    // Document preview functionality
+    function showDocumentPreview(docName, sourceIndex) {
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'doc-modal';
+        modal.id = 'docModal';
+        
+        // Get document content from Streamlit session state
+        const docContent = getDocumentContent(docName);
+        
+        modal.innerHTML = `
+            <div class="doc-modal-content">
+                <div class="doc-modal-header">
+                    <h3>📄 ${docName}</h3>
+                    <span class="doc-modal-close" onclick="closeDocumentPreview()">&times;</span>
+                </div>
+                <div class="doc-modal-body">
+                    <p><strong>Source:</strong> ${docName}</p>
+                    <p><strong>Relevance:</strong> ${getSourceRelevance(sourceIndex)}%</p>
+                    <hr>
+                    <div class="doc-content">
+                        <pre style="white-space: pre-wrap; font-family: inherit; background: var(--secondary-background, #f8f9fa); padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">${docContent}</pre>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        modal.style.display = 'block';
+    }
+    
+    function closeDocumentPreview() {
+        const modal = document.getElementById('docModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+    
+    function getDocumentContent(docName) {
+        // This will be populated by Streamlit with actual document content
+        return window.documentContents ? window.documentContents[docName] || 'Content not available' : 'Content not available';
+    }
+    
+    function getSourceRelevance(sourceIndex) {
+        // This will be populated by Streamlit with actual relevance scores
+        return window.sourceRelevances ? window.sourceRelevances[sourceIndex] || 'N/A' : 'N/A';
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('docModal');
+        if (event.target === modal) {
+            closeDocumentPreview();
+        }
+    }
+    </script>
+    """
+    
+    # Render the JavaScript component (hidden)
+    components.html(js_code, height=0)
+    
+    # Add modal CSS separately
+    st.markdown("""
+    <style>
+    /* Document preview modal */
+    .doc-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+    }
+    
+    .doc-modal-content {
+        background-color: var(--background-color, #fefefe);
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid var(--border-color, #888);
+        border-radius: 10px;
+        width: 80%;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    .doc-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border-color, #ddd);
+    }
+    
+    .doc-modal-close {
+        color: var(--text-color, #aaa);
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .doc-modal-close:hover {
+        color: var(--text-color, #000);
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Chat input form
     st.markdown("---")
     
-    # Simplified input form
+    # Form-based input that responds to Enter key
     with st.form(key="chat_form", clear_on_submit=True):
         col1, col2 = st.columns([5, 1])
         with col1:
             user_input = st.text_input(
-                "💬",
-                placeholder="Ask a question about your documents...",
+                "💬 Ask a question about your documents...",
+                placeholder="Type your question and press Enter...",
                 label_visibility="collapsed"
             )
         with col2:
             send_button = st.form_submit_button("Send", type="primary", use_container_width=True)
         
+        # Process input when form is submitted (Enter key or button click)
         if send_button and user_input.strip():
             process_user_query(user_input.strip())
             st.rerun()
@@ -285,6 +505,9 @@ def render_chat_interface() -> None:
 def process_user_query(query: str) -> None:
     """Process user query and generate response with enhanced error handling"""
     print(f"🔍 DEBUG: Processing query: '{query}'")
+    
+    # Store current query for context filtering
+    st.session_state.current_query = query
     
     # Add user message to chat history immediately
     st.session_state.chat_history.append({
@@ -432,6 +655,7 @@ def process_user_query(query: str) -> None:
 def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> List[Dict]:
     """Find most relevant document chunks using improved retrieval with filtering and reranking"""
     from .config import MAX_RELEVANT_CHUNKS, MIN_SIMILARITY_THRESHOLD, ENABLE_CHUNK_RERANKING
+    import streamlit as st  # Import at the top to avoid scope issues
     
     if top_k is None:
         top_k = MAX_RELEVANT_CHUNKS
@@ -453,6 +677,16 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
     
     print(f"🔍 DEBUG: Total documents to search: {len(all_documents)}")
     
+    # Enhanced similarity threshold based on query type
+    base_threshold = MIN_SIMILARITY_THRESHOLD
+    
+    if 'current_query' in st.session_state:
+        query = st.session_state.current_query.lower()
+        # Increase threshold for specific technical queries to avoid irrelevant results
+        if any(tech_term in query for tech_term in ['python', 'javascript', 'java', 'c++', 'programming', 'code']):
+            base_threshold = max(base_threshold, 0.35)  # Higher threshold for technical queries
+            print(f"🔍 DEBUG: Using higher threshold ({base_threshold}) for technical query")
+    
     for doc_idx, doc in enumerate(all_documents):
         print(f"🔍 DEBUG: Processing document {doc_idx + 1}/{len(all_documents)}: {doc.get('name', 'Unknown')} (type: {doc.get('file_type', 'FILE')})")
         
@@ -470,7 +704,7 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
                 print(f"🔍 DEBUG: Chunk {i} similarity: {similarity:.4f}")
                 
                 # Filter out chunks below similarity threshold
-                if similarity >= MIN_SIMILARITY_THRESHOLD:
+                if similarity >= base_threshold:
                     chunk_data = {
                         'content': doc['chunks'][i],
                         'document': doc['name'],
@@ -483,7 +717,7 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
                     relevant_chunks.append(chunk_data)
                     print(f"✅ DEBUG: Added chunk {i} from {doc.get('name', 'Unknown')} (similarity: {similarity:.4f})")
                 else:
-                    print(f"❌ DEBUG: Chunk {i} below threshold ({similarity:.4f} < {MIN_SIMILARITY_THRESHOLD})")
+                    print(f"❌ DEBUG: Chunk {i} below threshold ({similarity:.4f} < {base_threshold})")
                     
             except Exception as e:
                 print(f"❌ DEBUG: Error calculating similarity for chunk {i} in {doc.get('name', 'Unknown')}: {e}")
@@ -494,13 +728,12 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
     # Sort by similarity
     relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
     
-    # Advanced reranking if enabled
+    # Enhanced reranking with better diversity
     if ENABLE_CHUNK_RERANKING and len(relevant_chunks) > top_k:
-        # Boost chunks from different documents for diversity
         reranked_chunks = []
         used_docs = set()
         
-        # First pass: get best chunk from each document
+        # First pass: get best chunk from each document (prioritize diversity)
         for chunk in relevant_chunks:
             if chunk['doc_name'] not in used_docs and len(reranked_chunks) < top_k:
                 reranked_chunks.append(chunk)
@@ -520,6 +753,47 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
     return relevant_chunks[:top_k]
 
 
+def validate_response(response: str, query: str, context: str) -> bool:
+    """Validate if the response is relevant and not hallucinated"""
+    response_lower = response.lower()
+    query_lower = query.lower()
+    context_lower = context.lower()
+    
+    # Check for common hallucination patterns
+    hallucination_indicators = [
+        'red hat', 'openshift', 'nvidia', 'enterprise',
+        'based on the documents', 'according to the documents',
+        'the documents show', 'as mentioned in the documents'
+    ]
+    
+    # Check if response contains hallucination indicators
+    for indicator in hallucination_indicators:
+        if indicator in response_lower:
+            print(f"⚠️ DEBUG: Potential hallucination detected - '{indicator}' in response")
+            return False
+    
+    # Check if response is too generic
+    generic_phrases = [
+        'is a method for', 'is a technique for', 'is a process for',
+        'allows you to', 'enables you to', 'provides a way to'
+    ]
+    
+    generic_count = sum(1 for phrase in generic_phrases if phrase in response_lower)
+    if generic_count >= 2:
+        print(f"⚠️ DEBUG: Response seems too generic - {generic_count} generic phrases detected")
+        return False
+    
+    # Check if response actually addresses the query
+    query_terms = [term for term in query_lower.split() if len(term) > 2]
+    matching_terms = sum(1 for term in query_terms if term in response_lower)
+    
+    if matching_terms < len(query_terms) * 0.5:  # At least 50% of query terms should appear
+        print(f"⚠️ DEBUG: Response doesn't address query well - only {matching_terms}/{len(query_terms)} terms match")
+        return False
+    
+    return True
+
+
 def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_model: str, embedding_model: str) -> str:
     """Generate response using relevant chunks with optimized prompting and context"""
     if not relevant_chunks:
@@ -534,19 +808,41 @@ def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_mode
     ]
     
     if not high_quality_chunks:
-        return f"I found some content but it doesn't seem relevant enough (similarity < {MIN_SIMILARITY_THRESHOLD:.2f}) to answer: '{query}'"
+        return f"I don't have relevant information about that in the provided documents."
+    
+    # Additional relevance check - ensure content actually relates to the query
+    query_terms = query.lower().split()
+    relevant_chunks = []
+    
+    for chunk in high_quality_chunks:
+        content_lower = chunk['content'].lower()
+        # More strict relevance check - require multiple query terms to match
+        matching_terms = sum(1 for term in query_terms if len(term) > 2 and term in content_lower)
+        # Require at least 2 matching terms or high similarity (>0.7)
+        if matching_terms >= 2 or chunk['similarity'] > 0.7:
+            relevant_chunks.append(chunk)
+            print(f"✅ DEBUG: Chunk passed relevance check - {matching_terms} terms match, similarity: {chunk['similarity']:.3f}")
+        else:
+            print(f"❌ DEBUG: Chunk failed relevance check - {matching_terms} terms match, similarity: {chunk['similarity']:.3f}")
+    
+    if not relevant_chunks:
+        return f"I don't have relevant information about '{query}' in the provided documents. Please try rephrasing your question or upload relevant documents."
+    
+    # Sort by similarity and take only the most relevant chunks
+    relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
+    relevant_chunks = relevant_chunks[:2]  # Only top 2 most relevant chunks
     
     # Build optimized context with quality scoring
     context_parts = []
     total_context_length = 0
     
-    for i, chunk in enumerate(high_quality_chunks[:3]):  # Top 3 highest quality chunks
+    for i, chunk in enumerate(relevant_chunks):
         doc_name = chunk['document']
         content = chunk['content']
         similarity = chunk['similarity']
         
         # Truncate chunk if too long, but preserve sentence boundaries
-        max_chunk_length = min(1200, (MAX_CONTEXT_LENGTH - total_context_length) // max(1, (3 - i)))
+        max_chunk_length = min(800, (MAX_CONTEXT_LENGTH - total_context_length) // max(1, (2 - i)))
         
         if len(content) > max_chunk_length:
             # Find last sentence boundary within limit
@@ -570,26 +866,32 @@ def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_mode
     
     context = "\n\n---\n\n".join(context_parts)
     
-    # Optimized system prompt for better responses
-    system_prompt = f"""You are a knowledgeable AI assistant analyzing documents to answer questions accurately.
+    # Debug: Log what context we're using
+    print(f"🔍 DEBUG: Using {len(context_parts)} context parts for query: '{query}'")
+    for i, part in enumerate(context_parts):
+        print(f"🔍 DEBUG: Context {i+1}: {part[:100]}...")
+    
+    # Optimized system prompt for concise responses
+    system_prompt = f"""You are a helpful AI assistant. Answer questions based ONLY on the provided document context.
 
-CONTEXT: {len(context_parts)} relevant document excerpts (similarity ≥ {MIN_SIMILARITY_THRESHOLD:.2f})
-MODELS: {embedding_model} (retrieval) • {llm_model} (generation)
+CRITICAL RULES:
+- Give a direct, concise answer (1-3 sentences maximum) unless explictly asked.
+- Do NOT repeat the question
+- Do NOT say "Based on the documents" or similar phrases
+- Do NOT provide generic information not in the context
+- If context is irrelevant to the question, say "I don't have relevant information about that in the provided documents"
+- Focus on the specific question asked
+- Be brief and to the point
+- If you cannot answer from the context, say so clearly
 
-INSTRUCTIONS:
-- Answer ONLY based on the provided document context
-- Be specific and cite document names when making claims  
-- If multiple sources provide info, synthesize them clearly
-- If context is insufficient, state what information is missing
-- Be comprehensive but focused - avoid unnecessary elaboration
-- Use bullet points or numbered lists for complex information"""
+Available context: {len(context_parts)} relevant document excerpts"""
 
-    user_prompt = f"""QUESTION: {query}
-
-DOCUMENT CONTEXT:
+    user_prompt = f"""DOCUMENT CONTEXT:
 {context}
 
-Please provide a detailed, accurate answer based solely on the context above."""
+QUESTION: {query}
+
+ANSWER:"""
     
     # Try LlamaStack with optimized parameters
     try:
@@ -600,7 +902,13 @@ Please provide a detailed, accurate answer based solely on the context above."""
         )
         
         if response and len(response.strip()) > 20:  # Ensure meaningful response
-            return response.strip()
+            response = response.strip()
+            # Validate response to prevent hallucination
+            if validate_response(response, query, context):
+                print(f"✅ DEBUG: Response validation passed")
+                return response
+            else:
+                print(f"⚠️ DEBUG: Response validation failed, trying fallback")
     except Exception as e:
         print(f"LlamaStack completion failed: {e}")
     
@@ -608,12 +916,22 @@ Please provide a detailed, accurate answer based solely on the context above."""
     try:
         ollama_response = try_ollama_completion_optimized(query, context, llm_model)
         if ollama_response and len(ollama_response.strip()) > 20:
-            return ollama_response.strip()
+            ollama_response = ollama_response.strip()
+            # Validate response to prevent hallucination
+            if validate_response(ollama_response, query, context):
+                print(f"✅ DEBUG: Ollama response validation passed")
+                return ollama_response
+            else:
+                print(f"⚠️ DEBUG: Ollama response validation failed, using fallback")
     except Exception as e:
         print(f"Ollama completion failed: {e}")
     
     # Final fallback - enhanced content-based response
-    return generate_enhanced_content_response(query, high_quality_chunks)
+    fallback_response = generate_enhanced_content_response(query, relevant_chunks)
+    if validate_response(fallback_response, query, context):
+        return fallback_response
+    else:
+        return f"I don't have relevant information about '{query}' in the provided documents. Please try rephrasing your question or upload relevant documents."
 
 
 def try_ollama_completion(query: str, context: str, model: str) -> str:
@@ -682,15 +1000,15 @@ def try_ollama_completion_optimized(query: str, context: str, model: str) -> str
     try:
         from .config import LLM_TEMPERATURE, LLM_MAX_TOKENS
         
-        # Focused prompt for Ollama
+        # Focused prompt for Ollama - no repetition
         prompt = f"""Answer this question based ONLY on the provided document context.
-
-QUESTION: {query}
 
 DOCUMENT CONTEXT:
 {context[:3000]}  # Limit context for Ollama
 
-INSTRUCTIONS: Provide a focused, accurate answer citing specific documents. If the context doesn't contain enough information, say so.
+QUESTION: {query}
+
+INSTRUCTIONS: Provide a direct, concise answer. Do NOT repeat the question or context. Cite document names when making claims.
 
 ANSWER:"""
         
@@ -737,10 +1055,6 @@ def generate_enhanced_content_response(query: str, chunks: List[Dict]) -> str:
     
     # Build structured response
     response_parts = []
-    
-    # Header with query context
-    response_parts.append(f'## Answer to: "{query}"')
-    response_parts.append("")
     
     # Key information extraction
     response_parts.append("### 📋 Key Information Found:")

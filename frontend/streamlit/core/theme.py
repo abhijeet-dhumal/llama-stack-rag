@@ -1255,14 +1255,19 @@ def inject_light_theme_css():
         --background-color: #ffffff;
         --secondary-background: #f8f9fa;
         --sidebar-background: #f1f3f4;
-        --text-color: #333333;
+        --text-color: #262730;
         --secondary-text: #666666;
         --border-color: #dee2e6;
-        --user-message-bg: #007bff;
-        --assistant-message-bg: #e9ecef;
-        --assistant-message-text: #333333;
+        --user-message-bg: #ff4b4b;
+        --assistant-message-bg: #f8f9fa;
+        --assistant-message-text: #262730;
         --section-border: #d1d5db;
         --separator-color: #e5e7eb;
+        --primary-color: #ff4b4b;
+        --success-color: #28a745;
+        --warning-color: #ffc107;
+        --error-color: #dc3545;
+        --info-color: #17a2b8;
     }
     
     /* Main App Background - Full Page */
@@ -1326,7 +1331,7 @@ def inject_light_theme_css():
         background-color: var(--sidebar-background) !important;
         color: var(--text-color) !important;
         border-right: 2px solid var(--border-color) !important;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
     }
     
     /* Sidebar Content */
@@ -1355,8 +1360,8 @@ def inject_light_theme_css():
     .stSidebar .stTextInput > div > div > input:focus,
     .stSidebar .stSelectbox > div > div > div:focus,
     .stSidebar .stNumberInput > div > div > input:focus {
-        border-color: #007bff !important;
-        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.25) !important;
     }
     
     /* Specific styling for dropdown/select elements */
@@ -1379,7 +1384,7 @@ def inject_light_theme_css():
         border: 2px solid var(--section-border) !important;
         background-color: var(--secondary-background) !important;
         border-radius: 6px !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
     
     /* Individual dropdown options */
@@ -1424,8 +1429,8 @@ def inject_light_theme_css():
     }
     
     .stSelectbox > div > div > div:focus {
-        border-color: #007bff !important;
-        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25) !important;
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.25) !important;
     }
     
     /* Global select box options */
@@ -1433,7 +1438,7 @@ def inject_light_theme_css():
         border: 2px solid var(--section-border) !important;
         background-color: var(--secondary-background) !important;
         border-radius: 6px !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
     
     .stSelectbox > div > div > div > div > div > div {
@@ -1476,7 +1481,7 @@ def inject_light_theme_css():
     .stSidebar .stFileUploader {
         border: 2px dashed var(--section-border) !important;
         border-radius: 8px !important;
-        background-color: rgba(255, 255, 255, 0.02) !important;
+        background-color: rgba(255, 255, 255, 0.5) !important;
         padding: 1rem !important;
     }
     
@@ -1528,14 +1533,14 @@ def inject_light_theme_css():
     
     /* Status indicators with proper contrast for light theme */
     .stSidebar .stSuccess {
-        background-color: rgba(34, 197, 94, 0.1) !important;
-        border: 1px solid rgba(34, 197, 94, 0.3) !important;
+        background-color: rgba(40, 167, 69, 0.1) !important;
+        border: 1px solid rgba(40, 167, 69, 0.3) !important;
         color: #1f2937 !important;
     }
     
     .stSidebar .stError {
-        background-color: rgba(239, 68, 68, 0.1) !important;
-        border: 1px solid rgba(239, 68, 68, 0.3) !important;
+        background-color: rgba(220, 53, 69, 0.1) !important;
+        border: 1px solid rgba(220, 53, 69, 0.3) !important;
         color: #1f2937 !important;
     }
     
@@ -1626,23 +1631,23 @@ def inject_light_theme_css():
     
     /* Specific alert types with light theme colors */
     .stSuccess {
-        background-color: rgba(34, 197, 94, 0.1) !important;
-        border-color: rgba(34, 197, 94, 0.3) !important;
+        background-color: rgba(40, 167, 69, 0.1) !important;
+        border-color: rgba(40, 167, 69, 0.3) !important;
     }
     
     .stInfo {
-        background-color: rgba(59, 130, 246, 0.1) !important;
-        border-color: rgba(59, 130, 246, 0.3) !important;
+        background-color: rgba(23, 162, 184, 0.1) !important;
+        border-color: rgba(23, 162, 184, 0.3) !important;
     }
     
     .stWarning {
-        background-color: rgba(245, 158, 11, 0.1) !important;
-        border-color: rgba(245, 158, 11, 0.3) !important;
+        background-color: rgba(255, 193, 7, 0.1) !important;
+        border-color: rgba(255, 193, 7, 0.3) !important;
     }
     
     .stError {
-        background-color: rgba(239, 68, 68, 0.1) !important;
-        border-color: rgba(239, 68, 68, 0.3) !important;
+        background-color: rgba(220, 53, 69, 0.1) !important;
+        border-color: rgba(220, 53, 69, 0.3) !important;
     }
     
     /* Force override any inline styles in alerts for light theme */
@@ -1683,7 +1688,7 @@ def inject_light_theme_css():
     
     /* Progress Bar - Single Blue Bar */
     .stProgress > div > div > div > div {
-        background-color: #007bff !important;
+        background-color: var(--primary-color) !important;
     }
     .stProgress > div > div > div {
         background-color: rgba(0,0,0,0.1) !important;
@@ -1741,7 +1746,7 @@ def inject_light_theme_css():
     
     /* Selected dropdown item */
     .stSelectbox [aria-selected="true"] {
-        background-color: rgba(0, 123, 255, 0.1) !important;
+        background-color: rgba(255, 75, 75, 0.1) !important;
         color: var(--text-color) !important;
     }
     
@@ -1787,7 +1792,7 @@ def inject_light_theme_css():
     
     /* Button Styling */
     .stButton > button {
-        background-color: #007bff !important;
+        background-color: var(--primary-color) !important;
         color: white !important;
         border: none !important;
     }
@@ -1891,7 +1896,7 @@ def inject_light_theme_css():
     /* File upload area when dragging */
     .stFileUploader > div > div:hover {
         background-color: rgba(0, 0, 0, 0.02) !important;
-        border-color: #007bff !important;
+        border-color: var(--primary-color) !important;
     }
     
     /* Uploaded file indicators */
@@ -2012,7 +2017,7 @@ def inject_light_theme_css():
     
     /* Spinner */
     .stSpinner > div {
-        border-top-color: #007bff !important;
+        border-top-color: var(--primary-color) !important;
     }
     
     /* Hide only Streamlit Footer (keep menu and header visible) */
@@ -2052,7 +2057,7 @@ def inject_light_theme_css():
         color: var(--text-color) !important;
     }
     
-    /* Ensure no invisible text in dark theme */
+    /* Ensure no invisible text in light theme */
     .stApp *[style*="color: rgb(49, 51, 63)"],
     .stApp *[style*="color: #31333f"],
     .stApp *[style*="color: rgb(38, 39, 48)"] {
@@ -2088,7 +2093,7 @@ def inject_light_theme_css():
         background: var(--secondary-background);
     }
     .chat-container::-webkit-scrollbar-thumb {
-        background: #007bff;
+        background: var(--primary-color);
         border-radius: 3px;
     }
     

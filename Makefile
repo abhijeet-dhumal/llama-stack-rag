@@ -82,43 +82,41 @@ setup-mcp:
 	@npm install
 	@echo ""
 	@echo "🧪 Testing MCP server installation..."
-	@if npx @just-every/mcp-read-website-fast --help &> /dev/null; then \
-		echo "✅ MCP server installed successfully!"; \
+	@echo "   Testing Just-Every MCP (reliable markdown extraction)..."
+	@timeout 15s npx @just-every/mcp-read-website-fast fetch "https://example.com" --output markdown > /dev/null 2>&1; \
+	if [ $$? -eq 0 ]; then \
+		echo "✅ Just-Every MCP web content extraction test passed!"; \
 		echo ""; \
-		echo "🌐 Testing web content extraction..."; \
-		echo "   Test URL: https://example.com"; \
-		timeout 10s npx @just-every/mcp-read-website-fast fetch "https://example.com" --output markdown > /dev/null 2>&1; \
-		if [ $$? -eq 0 ]; then \
-			echo "✅ Web content extraction test passed!"; \
-			echo ""; \
-			echo "🎉 MCP server setup complete!"; \
-			echo "   You can now use web URLs in the RAG application"; \
-			echo ""; \
-			echo "📖 Usage:"; \
-			echo "   1. Start the application: make start"; \
-			echo "   2. Go to 'Web URLs' tab in the sidebar"; \
-			echo "   3. Enter any web URL to extract and process content"; \
-		else \
-			echo "⚠️  MCP server installed but test failed (this might be normal)"; \
-			echo "   Try using the application - fallback method will work if needed"; \
-		fi; \
+		echo "🎉 MCP server setup complete!"; \
+		echo "   🥇 Primary: Just-Every MCP (reliable markdown extraction)"; \
+		echo "   🥈 Fallback: BeautifulSoup (Python fallback)"; \
+		echo ""; \
+		echo "📖 Usage:"; \
+		echo "   1. Start the application: make start"; \
+		echo "   2. Go to 'Web URLs' tab in the sidebar"; \
+		echo "   3. Enter any web URL to extract and process content"; \
+		echo "   4. The system will use Just-Every MCP with BeautifulSoup fallback"; \
 	else \
-		echo "❌ MCP server installation failed"; \
-		echo "   The application will use fallback method (BeautifulSoup)"; \
-		echo "   Make sure you have the required Python packages:"; \
-		echo "   pip install beautifulsoup4 markdownify requests"; \
+		echo "⚠️  Just-Every MCP test failed, will use BeautifulSoup fallback"; \
+		echo ""; \
+		echo "🎉 MCP server setup complete!"; \
+		echo "   Primary: Just-Every MCP (no API key required)"; \
+		echo "   Backup: BeautifulSoup (Python fallback)"; \
 	fi
 	@echo ""
 	@echo "🔧 Troubleshooting:"
-	@echo "   - If MCP server fails, the app will automatically use fallback"
+	@echo "   - Just-Every MCP works without API keys (100% free!)"
+	@echo "   - Just-Every MCP is reliable markdown extraction"
+	@echo "   - If MCP server fails, the app will use BeautifulSoup fallback"
 	@echo "   - Check that your firewall allows outbound HTTP/HTTPS connections"
-	@echo "   - Some websites may block automated access"
 	@echo ""
 	@echo "📚 Supported by this setup:"
+	@echo "   ✅ GitHub README files (raw.githubusercontent.com)"
+	@echo "   ✅ Complex web applications"
 	@echo "   ✅ News articles and blog posts"
 	@echo "   ✅ Documentation pages"
 	@echo "   ✅ Wikipedia articles"
-	@echo "   ✅ Most static content websites"
+	@echo "   ✅ Most static and dynamic content websites"
 
 # Install Python dependencies
 install:

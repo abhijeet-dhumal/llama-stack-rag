@@ -30,7 +30,7 @@ BATCH_SIZE_LARGE_FILES = 10      # Larger batches for embedding generation
 CONTENT_OPTIMIZATION_THRESHOLD = 500000  # Characters threshold for content optimization
 
 # Response Quality Configuration
-MIN_SIMILARITY_THRESHOLD = 0.25  # Higher threshold for relevant chunks (was 0.1)
+MIN_SIMILARITY_THRESHOLD = 0.5  # Higher threshold for more relevant chunks (was 0.35)
 MAX_CONTEXT_LENGTH = 6000        # Optimized context length for focused responses
 ENABLE_CHUNK_RERANKING = True    # Re-rank chunks by relevance
 
