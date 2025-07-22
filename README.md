@@ -375,47 +375,10 @@ graph TB
 
 ### **🔧 Service Architecture**
 
-#### **Microservices Design**
-
-```mermaid
-graph LR
-    subgraph "Frontend Services"
-        STREAMLIT[Streamlit App<br/>Port 8501]
-        AUTH_SERVICE[Auth Service<br/>Session Management]
-        UI_SERVICE[UI Service<br/>Components]
-    end
-    
-    subgraph "AI Services"
-        LLAMASTACK[LlamaStack<br/>Port 8321]
-        OLLAMA[Ollama<br/>Port 11434]
-        MCP_SERVER[MCP Server<br/>Web Extraction]
-    end
-    
-    subgraph "Data Services"
-        SQLITE_SERVICE[SQLite Service<br/>Metadata]
-        FAISS_SERVICE[FAISS Service<br/>Vectors]
-        SYNC_SERVICE[Sync Service<br/>Data Sync]
-    end
-    
-    subgraph "Processing Services"
-        EMBED_SERVICE[Embedding Service<br/>sentence-transformers]
-        CHUNK_SERVICE[Chunking Service<br/>Text Processing]
-        SEARCH_SERVICE[Search Service<br/>Vector Search]
-    end
-    
-    STREAMLIT --> AUTH_SERVICE
-    STREAMLIT --> UI_SERVICE
-    STREAMLIT --> LLAMASTACK
-    STREAMLIT --> OLLAMA
-    STREAMLIT --> MCP_SERVER
-    LLAMASTACK --> OLLAMA
-    LLAMASTACK --> EMBED_SERVICE
-    EMBED_SERVICE --> FAISS_SERVICE
-    CHUNK_SERVICE --> EMBED_SERVICE
-    SEARCH_SERVICE --> FAISS_SERVICE
-    SYNC_SERVICE --> SQLITE_SERVICE
-    SYNC_SERVICE --> FAISS_SERVICE
-```
+**Frontend Services**: Streamlit App (Port 8501), Authentication, UI Components  
+**AI Services**: LlamaStack (Port 8321), Ollama (Port 11434), MCP Server  
+**Data Services**: SQLite (Metadata), FAISS (Vectors), Sync Manager  
+**Processing Services**: Embedding Engine, Chunking Service, Search Service
 
 ### **🔄 Component Interaction Flow**
 
@@ -471,165 +434,30 @@ sequenceDiagram
 
 ### **🔐 Security Architecture**
 
-```mermaid
-graph TB
-    subgraph "Authentication Layer"
-        AUTH[Authentication Service]
-        SESSION[Session Management]
-        TOKEN[Token Generation]
-        VALIDATE[Input Validation]
-    end
-    
-    subgraph "Data Security"
-        ENCRYPT[Data Encryption]
-        ISOLATE[User Isolation]
-        SANITIZE[Input Sanitization]
-        AUDIT[Audit Logging]
-    end
-    
-    subgraph "Network Security"
-        HTTPS[HTTPS/TLS]
-        CORS[CORS Configuration]
-        RATE_LIMIT[Rate Limiting]
-        FIREWALL[Firewall Rules]
-    end
-    
-    AUTH --> SESSION
-    SESSION --> TOKEN
-    TOKEN --> VALIDATE
-    VALIDATE --> SANITIZE
-    SANITIZE --> ISOLATE
-    ISOLATE --> ENCRYPT
-    ENCRYPT --> AUDIT
-    HTTPS --> CORS
-    CORS --> RATE_LIMIT
-    RATE_LIMIT --> FIREWALL
-```
+**Authentication**: Session-based authentication with token management  
+**Data Security**: User isolation, input sanitization, audit logging  
+**Network Security**: HTTPS/TLS, CORS configuration, rate limiting
 
 ### **📊 Performance Architecture**
 
-#### **Caching Strategy**
-
-```mermaid
-graph LR
-    subgraph "Cache Layers"
-        BROWSER[Browser Cache<br/>Static Assets]
-        CDN[CDN Cache<br/>Global Assets]
-        APP[Application Cache<br/>Session Data]
-        MODEL[Model Cache<br/>AI Models]
-        VECTOR[Vector Cache<br/>Embeddings]
-    end
-    
-    subgraph "Cache Policies"
-        TTL[Time-to-Live]
-        LRU[Least Recently Used]
-        LFU[Least Frequently Used]
-        WRITE_THROUGH[Write-Through]
-        WRITE_BEHIND[Write-Behind]
-    end
-    
-    BROWSER --> TTL
-    CDN --> TTL
-    APP --> LRU
-    MODEL --> LFU
-    VECTOR --> WRITE_THROUGH
-```
+**Caching Strategy**: Browser cache, application cache, model cache  
+**Optimization**: Vector search optimization, memory management  
+**Response Time**: <3 seconds target with sub-second vector search
 
 ### **🔧 Deployment Architecture**
 
-#### **Container Orchestration**
-
-```mermaid
-graph TB
-    subgraph "Docker Containers"
-        STREAMLIT_CONTAINER[Streamlit Container<br/>Port 8501]
-        LLAMASTACK_CONTAINER[LlamaStack Container<br/>Port 8321]
-        OLLAMA_CONTAINER[Ollama Container<br/>Port 11434]
-        MCP_CONTAINER[MCP Container<br/>Web Extraction]
-    end
-    
-    subgraph "Persistent Storage"
-        VOLUME_DB[Database Volume<br/>SQLite Files]
-        VOLUME_FAISS[FAISS Volume<br/>Vector Files]
-        VOLUME_MODELS[Models Volume<br/>AI Models]
-        VOLUME_LOGS[Logs Volume<br/>Application Logs]
-    end
-    
-    subgraph "Network"
-        NETWORK[Internal Network<br/>Service Communication]
-        EXTERNAL[External Network<br/>User Access]
-    end
-    
-    STREAMLIT_CONTAINER --> VOLUME_DB
-    STREAMLIT_CONTAINER --> VOLUME_FAISS
-    STREAMLIT_CONTAINER --> VOLUME_LOGS
-    LLAMASTACK_CONTAINER --> VOLUME_MODELS
-    OLLAMA_CONTAINER --> VOLUME_MODELS
-    MCP_CONTAINER --> VOLUME_LOGS
-    
-    STREAMLIT_CONTAINER --> NETWORK
-    LLAMASTACK_CONTAINER --> NETWORK
-    OLLAMA_CONTAINER --> NETWORK
-    MCP_CONTAINER --> NETWORK
-    
-    EXTERNAL --> STREAMLIT_CONTAINER
-```
+**Containerization**: Podman containers for all services  
+**Storage**: Persistent volumes for database, vectors, models  
+**Network**: Internal service communication, external user access
 ```
 
 ### **Technology Stack**
 
-```mermaid
-graph LR
-    subgraph "🖥️ Frontend"
-        ST[Streamlit 1.28+]
-        CSS[Custom CSS/JS]
-        PD[Pandas DataFrames]
-    end
-    
-    subgraph "🌐 Web Processing"
-        MCP[MCP Server]
-        BS[BeautifulSoup]
-        REQ[Requests]
-        MD[Markdownify]
-    end
-    
-    subgraph "🤖 AI/ML"
-        LS[LlamaStack API]
-        ST_EMB[Sentence Transformers]
-        OL[Ollama]
-        HF[Hugging Face]
-        NP[NumPy]
-    end
-    
-    subgraph "📊 Data Processing"
-        DOC[Docling]
-        PDF[PyPDF2]
-        JSON[JSON Storage]
-        CHUNK[Text Chunking]
-    end
-    
-    subgraph "🔧 Infrastructure"
-        PY[Python 3.12+]
-        SUB[Subprocess]
-        OS[OS Integration]
-        NODE[Node.js]
-    end
-    
-    ST --> LS
-    ST --> CSS
-    ST --> PD
-    ST --> MCP
-    MCP --> BS
-    MCP --> REQ
-    BS --> MD
-    LS --> ST_EMB
-    LS --> OL
-    ST_EMB --> NP
-    DOC --> PDF
-    DOC --> CHUNK
-    ST --> DOC
-    MCP --> NODE
-```
+**Frontend**: Streamlit 1.28+ with custom CSS/JS  
+**AI/ML**: LlamaStack API, Sentence Transformers, Ollama  
+**Data Processing**: PyPDF2, python-docx, BeautifulSoup  
+**Database**: SQLite (metadata), FAISS (vectors)  
+**Infrastructure**: Python 3.12+, Podman containers
 
 ---
 

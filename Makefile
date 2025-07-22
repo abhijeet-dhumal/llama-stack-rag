@@ -23,9 +23,11 @@ help:
 	@echo "  stop-ollama  - Stop only Ollama"
 	@echo "  restart      - Restart all services"
 	@echo ""
-	@echo "LlamaStack Commands:"
-	@echo "  llamastack   - Start LlamaStack server"
-	@echo "  ollama       - Start Ollama server"
+	@echo "Service Commands (for separate terminals):"
+	@echo "  ollama       - Start Ollama server (Terminal 1)"
+	@echo "  llamastack   - Start LlamaStack server (Terminal 2)"
+	@echo "  mcp          - Check MCP server status (Terminal 3, optional)"
+	@echo "  start-frontend - Start Streamlit frontend (Terminal 4)"
 	@echo ""
 	@echo "Test Commands:"
 	@echo "  test         - Run Python tests"
@@ -41,29 +43,41 @@ help:
 	@echo "  1. make setup"
 	@echo "  2. source venv/bin/activate"
 	@echo "  3. make install"
-	@echo "  4. make setup-mcp"
-	@echo "  5. make start (starts all services + frontend)"
+	@echo "  4. make start (starts all services + frontend)"
 	@echo ""
-	@echo "🔧 Alternative Flow (manual service control):"
+	@echo "🌐 Optional: make setup-mcp (for web URL processing)"
+	@echo ""
+	@echo "🔧 Multi-Terminal Development Flow:"
 	@echo "  1. make setup"
 	@echo "  2. source venv/bin/activate"
 	@echo "  3. make install"
-	@echo "  4. make setup-mcp"
-	@echo "  5. make ollama (in one terminal)"
-	@echo "  6. make llamastack (in another terminal)"
-	@echo "  7. make start-frontend (in third terminal)"
+	@echo "  4. Terminal 1: make ollama"
+	@echo "  5. Terminal 2: make llamastack"
+	@echo "  6. Terminal 3: make start-frontend"
+	@echo ""
+	@echo "🌐 Optional: Web Content Processing"
+	@echo "  make setup-mcp (for web URL processing)"
+	@echo "  Terminal 4: make mcp (check MCP status)"
+	@echo ""
+	@echo "📋 Benefits of separate terminals:"
+	@echo "  • Better debugging and log visibility"
+	@echo "  • Independent service control"
+	@echo "  • Easier troubleshooting"
+	@echo "  • Service-specific monitoring"
 
-# Complete setup including MCP server
+# Complete setup
 setup: venv
 	@echo "✅ Virtual environment created!"
 	@echo "   Please activate it with: source venv/bin/activate"
-	@echo "   Then run: make install setup-mcp"
+	@echo "   Then run: make install"
 	@echo ""
 	@echo "📋 Complete setup steps:"
 	@echo "   1. source venv/bin/activate"
 	@echo "   2. make install"
-	@echo "   3. make setup-mcp"
-	@echo "   4. make start"
+	@echo "   3. make start (or use multi-terminal flow)"
+	@echo ""
+	@echo "🌐 Optional: Web Content Processing"
+	@echo "   make setup-mcp (for web URL processing)"
 
 # Setup MCP server for web content processing
 setup-mcp:
@@ -234,16 +248,49 @@ stop-ollama:
 	@pkill -f "ollama serve" 2>/dev/null || echo "   No Ollama processes found"
 	@echo "✅ Ollama stopped"
 
-# Start LlamaStack server
+# Start LlamaStack server (for separate terminal)
 llamastack:
 	@echo "🦙 Starting LlamaStack server..."
-	@echo "   Activating virtual environment..."
-	@source venv/bin/activate && llama stack run ./llamastack/config/llamastack-config.yaml
+	@echo "   Port: 8321"
+	@echo "   Config: ./llamastack/config/llamastack-config.yaml"
+	@echo "   Health check: http://localhost:8321/v1/health"
+	@echo ""
+	@if [ -z "$$VIRTUAL_ENV" ]; then \
+		echo "⚠️  Virtual environment not detected!"; \
+		echo "   Activating virtual environment..."; \
+		source venv/bin/activate && llama stack run ./llamastack/config/llamastack-config.yaml; \
+	else \
+		echo "✅ Virtual environment detected: $$VIRTUAL_ENV"; \
+		llama stack run ./llamastack/config/llamastack-config.yaml; \
+	fi
 
-# Start Ollama server
+# Start Ollama server (for separate terminal)
 ollama:
 	@echo "🏠 Starting Ollama server..."
+	@echo "   Port: 11434"
+	@echo "   Health check: http://localhost:11434/api/version"
+	@echo "   Models: http://localhost:11434/api/tags"
+	@echo ""
 	ollama serve
+
+# Start MCP server (for separate terminal)
+mcp:
+	@echo "🔧 Starting MCP server for web content processing..."
+	@echo "   Testing MCP server availability..."
+	@if npx @just-every/mcp-read-website-fast --version &> /dev/null; then \
+		echo "✅ MCP server is available"; \
+		echo "   Usage: npx @just-every/mcp-read-website-fast fetch <URL> --output markdown"; \
+		echo ""; \
+		echo "🌐 MCP server is ready for web content extraction!"; \
+		echo "   The Streamlit app will automatically use this service."; \
+		echo ""; \
+		echo "📖 Test command:"; \
+		echo "   npx @just-every/mcp-read-website-fast fetch https://example.com --output markdown"; \
+	else \
+		echo "❌ MCP server not available"; \
+		echo "   Run 'make setup-mcp' to install it"; \
+		echo "   The app will use fallback method (BeautifulSoup)"; \
+	fi
 
 # Run tests
 test:
