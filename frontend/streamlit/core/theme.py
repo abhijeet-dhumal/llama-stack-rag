@@ -28,48 +28,65 @@ def render_header_theme_toggle() -> None:
     # Create a small theme toggle button in a container
     st.markdown("""
     <style>
-    /* Style for small theme toggle - aligned with Streamlit UI */
+    /* Compact theme toggle styling */
+    .theme-toggle-container {
+        position: fixed !important;
+        top: 0.5rem !important;
+        right: 4rem !important;
+        z-index: 9999 !important;
+        width: 32px !important;
+        height: 32px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .theme-toggle-small {
+        position: absolute !important;
+        top: 0 !important;
+        right: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .theme-toggle-small .stButton {
+        position: absolute !important;
+        top: 0 !important;
+        right: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
     .theme-toggle-small .stButton button {
         background: rgba(255, 255, 255, 0.95) !important;
         border: 1px solid rgba(0, 0, 0, 0.08) !important;
         border-radius: 50% !important;
-        width: 28px !important;
-        height: 28px !important;
+        width: 32px !important;
+        height: 32px !important;
         padding: 0 !important;
-        font-size: 13px !important;
+        font-size: 14px !important;
         margin: 0 !important;
         backdrop-filter: blur(10px) !important;
         transition: all 0.15s ease !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
-        min-width: 28px !important;
-        min-height: 28px !important;
+        min-width: 32px !important;
+        min-height: 32px !important;
+        max-width: 32px !important;
+        max-height: 32px !important;
     }
     
     .theme-toggle-small .stButton button:hover {
         background: rgba(255, 255, 255, 1) !important;
-        transform: scale(1.02) !important;
+        transform: scale(1.05) !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
     }
     
     .theme-toggle-small .stButton button:focus {
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
         outline: none !important;
-    }
-    
-    /* Position aligned with Streamlit's UI elements */
-    .theme-toggle-container {
-        position: fixed;
-        top: 0.65rem;
-        right: 4.5rem;
-        z-index: 999;
-        width: 28px;
-        height: 28px;
-    }
-    
-    /* Remove button container padding */
-    .theme-toggle-small .stButton {
-        margin: 0 !important;
-        padding: 0 !important;
     }
     
     /* Dark theme adjustments */
@@ -88,14 +105,18 @@ def render_header_theme_toggle() -> None:
     /* Ensure it works well with Streamlit's responsive design */
     @media (max-width: 768px) {
         .theme-toggle-container {
-            right: 4rem;
-            top: 0.5rem;
+            right: 3.5rem !important;
+            top: 0.4rem !important;
         }
         
         .theme-toggle-small .stButton button {
-            width: 26px !important;
-            height: 26px !important;
+            width: 28px !important;
+            height: 28px !important;
             font-size: 12px !important;
+            min-width: 28px !important;
+            min-height: 28px !important;
+            max-width: 28px !important;
+            max-height: 28px !important;
         }
     }
     </style>

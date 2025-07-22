@@ -88,6 +88,10 @@ def initialize_session_state() -> None:
     # Theme state
     if 'dark_theme' not in st.session_state:
         st.session_state.dark_theme = False  # Light theme default
+    
+    # Page navigation state
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = None  # Default to main page
 
 
 def create_fallback_client():

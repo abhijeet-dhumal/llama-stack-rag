@@ -6,6 +6,8 @@ Handles file uploads, processing, and document library management
 import streamlit as st
 import time
 import pandas as pd
+import hashlib
+from pathlib import Path
 from typing import List, Dict, Any
 from .utils import format_file_size, mark_upload_start, mark_upload_success, mark_upload_failed
 from .web_content_processor import WebContentProcessor
@@ -899,15 +901,22 @@ def validate_uploaded_files(uploaded_files: List[Any]) -> List[Any]:
 def process_uploaded_files(files: List[Any]) -> int:
     """Process uploaded files with individual state tracking and interruption handling"""
     if not files:
+        print("⚠️ No files provided to process")
         return 0
     
     from .utils import mark_upload_success, mark_upload_failed
     
     successful_files = 0
     
+    print(f"🚀 Starting to process {len(files)} files")
+    
     for file in files:
-        file_size_mb = file.size / (1024 * 1024) if hasattr(file, 'size') else 0
-        file_id = f"{file.name}_{file.size}"
+        # Safely get file size, defaulting to 0 if None
+        file_size = getattr(file, 'size', 0) or 0
+        file_size_mb = file_size / (1024 * 1024)
+        file_id = f"{file.name}_{file_size}"
+        
+        print(f"📄 Processing file: {file.name} ({file_size_mb:.1f}MB)")
         
         st.markdown(f"### 📄 Processing: `{file.name}` ({file_size_mb:.1f}MB)")
         
@@ -930,135 +939,165 @@ def process_uploaded_files(files: List[Any]) -> int:
             metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
             
             try:
-                start_time = time.time()
-                
-                # Step 1: Read file content
-                step_start = time.time()
-                progress_bar.progress(0.1)
-                status_text.text("📥 Reading file content...")
-                
-                # Check for interruption during processing
-                if file_id not in st.session_state.currently_uploading:
-                    st.session_state.upload_interrupted = True
-                    raise InterruptedError(f"Upload interrupted for {file.name}")
-                
-                content = read_file_content(file)
-                if not content:
-                    st.error(f"❌ Could not extract content from {file.name}")
-                    mark_upload_failed(file_id)
-                    continue
-                
-                step_time = time.time() - step_start
-                timing_text.text(f"⏱️ File reading: {step_time:.1f}s")
-                
-                actual_size_mb = len(content.encode('utf-8')) / (1024 * 1024)
-                
-                with metrics_col1:
-                    st.metric("📊 Content Size", f"{actual_size_mb:.2f} MB")
-                
-                # Step 2: Create chunks with optimization  
-                step_start = time.time()
-                progress_bar.progress(0.3)
-                status_text.text("✂️ Creating optimized chunks...")
-                
-                # Check for interruption
-                if file_id not in st.session_state.currently_uploading:
-                    st.session_state.upload_interrupted = True
-                    raise InterruptedError(f"Upload interrupted for {file.name}")
-                
-                chunks = create_enhanced_chunks(content)
-                
-                # Apply large file optimizations
-                from .config import LARGE_FILE_THRESHOLD_MB, MAX_CHUNKS_PER_FILE
-                if actual_size_mb > LARGE_FILE_THRESHOLD_MB and len(chunks) > MAX_CHUNKS_PER_FILE:
-                    status_text.text(f"🚀 Optimizing {len(chunks)} chunks for performance...")
-                    chunks = optimize_chunks_for_large_files(chunks)
-                
-                step_time = time.time() - step_start
-                timing_text.text(f"⏱️ Chunking: {step_time:.1f}s")
-                
-                with metrics_col2:
-                    st.metric("📦 Chunks Created", f"{len(chunks)}")
-                
-                # Step 3: Generate embeddings using optimized batch processing
-                step_start = time.time()
-                progress_bar.progress(0.5)
-                status_text.text("🧠 Generating embeddings (optimized)...")
-                
-                # Check for interruption before expensive operation
-                if file_id not in st.session_state.currently_uploading:
-                    st.session_state.upload_interrupted = True
-                    raise InterruptedError(f"Upload interrupted for {file.name}")
-                
-                embeddings, embedding_errors = generate_embeddings_batch_optimized(
-                    chunks, 
-                    progress_bar, 
-                    status_text,
-                    start_progress=0.5,
-                    file_id=file_id  # Pass file_id for interruption checking
-                )
-                
-                step_time = time.time() - step_start
-                timing_text.text(f"⏱️ Embeddings: {step_time:.1f}s")
-                
-                with metrics_col3:
-                    embedding_quality = max(0, (len(chunks) - embedding_errors) / len(chunks) * 100)
-                    st.metric("🎯 Quality", f"{embedding_quality:.0f}%")
-                
-                # Step 4: Store document
-                step_start = time.time()
-                progress_bar.progress(0.95)
-                status_text.text("💾 Storing document...")
-                
-                # Store document data with backup for session state persistence
-                doc_data = {
-                    'name': file.name,
-                    'content': content,
-                    'chunks': chunks,
-                    'embeddings': embeddings,
-                    'processing_time': time.time() - start_time,
-                    'chunk_count': len(chunks),
-                    'embedding_errors': embedding_errors,
-                    'file_size_mb': actual_size_mb
-                }
-                
-                # Check for duplicates before adding
-                if 'uploaded_documents' not in st.session_state:
-                    st.session_state.uploaded_documents = []
-                
-                # Check if document with same name and size already exists
-                file_id = f"{file.name}_{file.size}"
-                existing_docs = [doc for doc in st.session_state.uploaded_documents 
-                               if doc.get('name') == file.name and 
-                               doc.get('file_size_mb', 0) == actual_size_mb]
-                
-                if existing_docs:
-                    st.warning(f"⚠️ File '{file.name}' already exists in your documents")
-                    mark_upload_success(file_id)  # Mark as processed to avoid retry
-                    continue
-                
-                # Add to documents array (only one array to avoid duplication)
-                st.session_state.uploaded_documents.append(doc_data)
-                
-                # Final progress
-                progress_bar.progress(1.0)
-                total_time = time.time() - start_time
-                
-                status_text.text("✅ Processing complete!")
-                timing_text.text(f"⏱️ Total time: {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)")
-                
-                # Show performance summary
-                st.success(f"""
-                📄 **{file.name}** processed successfully!
-                - **Size:** {actual_size_mb:.1f}MB → {len(chunks)} chunks
-                - **Quality:** {embedding_quality:.0f}% embeddings successful
-                - **Speed:** {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)
-                """)
-                
-                # Mark this file as successfully processed
-                mark_upload_success(file_id)
-                successful_files += 1
-                
+                    start_time = time.time()
+                    
+                    # Step 1: Read file content
+                    step_start = time.time()
+                    progress_bar.progress(0.1)
+                    status_text.text("📥 Reading file content...")
+                    
+                    # Check for interruption during processing
+                    if file_id not in st.session_state.currently_uploading:
+                        st.session_state.upload_interrupted = True
+                        raise InterruptedError(f"Upload interrupted for {file.name}")
+                    
+                    content = read_file_content(file)
+                    if not content:
+                        st.error(f"❌ Could not extract content from {file.name}")
+                        mark_upload_failed(file_id)
+                        continue
+                    
+                    step_time = time.time() - step_start
+                    timing_text.text(f"⏱️ File reading: {step_time:.1f}s")
+                    
+                    actual_size_mb = len(content.encode('utf-8')) / (1024 * 1024)
+                    
+                    with metrics_col1:
+                        st.metric("📊 Content Size", f"{actual_size_mb:.2f} MB")
+                    
+                    # Step 2: Create chunks with optimization  
+                    step_start = time.time()
+                    progress_bar.progress(0.3)
+                    status_text.text("✂️ Creating optimized chunks...")
+                    
+                    # Check for interruption
+                    if file_id not in st.session_state.currently_uploading:
+                        st.session_state.upload_interrupted = True
+                        raise InterruptedError(f"Upload interrupted for {file.name}")
+                    
+                    chunks = create_enhanced_chunks(content)
+                    
+                    # Apply large file optimizations
+                    from .config import LARGE_FILE_THRESHOLD_MB, MAX_CHUNKS_PER_FILE
+                    if actual_size_mb > LARGE_FILE_THRESHOLD_MB and len(chunks) > MAX_CHUNKS_PER_FILE:
+                        status_text.text(f"🚀 Optimizing {len(chunks)} chunks for performance...")
+                        chunks = optimize_chunks_for_large_files(chunks)
+                    
+                    step_time = time.time() - step_start
+                    timing_text.text(f"⏱️ Chunking: {step_time:.1f}s")
+                    
+                    with metrics_col2:
+                        st.metric("📦 Chunks Created", f"{len(chunks)}")
+                    
+                    # Step 3: Generate embeddings using optimized batch processing
+                    step_start = time.time()
+                    progress_bar.progress(0.5)
+                    status_text.text("🧠 Generating embeddings (optimized)...")
+                    
+                    # Check for interruption before expensive operation
+                    if file_id not in st.session_state.currently_uploading:
+                        st.session_state.upload_interrupted = True
+                        raise InterruptedError(f"Upload interrupted for {file.name}")
+                    
+                    embeddings, embedding_errors = generate_embeddings_batch_optimized(
+                        chunks, 
+                        progress_bar, 
+                        status_text,
+                        start_progress=0.5,
+                        file_id=file_id  # Pass file_id for interruption checking
+                    )
+                    
+                    step_time = time.time() - step_start
+                    timing_text.text(f"⏱️ Embeddings: {step_time:.1f}s")
+                    
+                    with metrics_col3:
+                        embedding_quality = max(0, (len(chunks) - embedding_errors) / len(chunks) * 100)
+                        st.metric("🎯 Quality", f"{embedding_quality:.0f}%")
+                    
+                    # Step 4: Store document
+                    step_start = time.time()
+                    progress_bar.progress(0.95)
+                    status_text.text("💾 Storing document...")
+                    
+                    # Store document data with backup for session state persistence
+                    doc_data = {
+                        'name': file.name,
+                        'content': content,
+                        'chunks': chunks,
+                        'embeddings': embeddings,
+                        'processing_time': time.time() - start_time,
+                        'chunk_count': len(chunks),
+                        'embedding_errors': embedding_errors,
+                        'file_size_mb': actual_size_mb
+                    }
+                    
+                    # Save to database
+                    try:
+                        from .database.models import Document
+                        from .auth.authentication import AuthManager
+                        
+                        if AuthManager.is_authenticated():
+                            user = AuthManager.get_current_user()
+                            
+                            # Create document object
+                            document = Document(
+                                user_id=user.id,
+                                name=file.name,
+                                file_type=Path(file.name).suffix.lower(),
+                                file_size_mb=actual_size_mb,
+                                content_hash=hashlib.md5(content.encode()).hexdigest(),
+                                processing_status='completed',
+                                chunk_count=len(chunks),
+                                character_count=len(content)
+                            )
+                            
+                            # Save to database
+                            document.save()
+                            print(f"✅ Saved document '{file.name}' to database with ID {document.id}")
+                        else:
+                            print("⚠️ User not authenticated, skipping database save")
+                            
+                    except Exception as e:
+                        print(f"❌ Error saving to database: {e}")
+                        # Continue with session state storage as fallback
+                    
+                    # Check for duplicates before adding to session state
+                    if 'uploaded_documents' not in st.session_state:
+                        st.session_state.uploaded_documents = []
+                    
+                    # Check if document with same name and size already exists
+                    file_id = f"{file.name}_{file.size}"
+                    existing_docs = [doc for doc in st.session_state.uploaded_documents 
+                                   if doc.get('name') == file.name and 
+                                   doc.get('file_size_mb', 0) == actual_size_mb]
+                    
+                    if existing_docs:
+                        st.warning(f"⚠️ File '{file.name}' already exists in your documents")
+                        mark_upload_success(file_id)  # Mark as processed to avoid retry
+                        continue
+                    
+                    # Add to documents array (only one array to avoid duplication)
+                    st.session_state.uploaded_documents.append(doc_data)
+                    
+                    # Final progress
+                    progress_bar.progress(1.0)
+                    total_time = time.time() - start_time
+                    
+                    status_text.text("✅ Processing complete!")
+                    timing_text.text(f"⏱️ Total time: {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)")
+                    
+                    # Show performance summary
+                    st.success(f"""
+                    📄 **{file.name}** processed successfully!
+                    - **Size:** {actual_size_mb:.1f}MB → {len(chunks)} chunks
+                    - **Quality:** {embedding_quality:.0f}% embeddings successful
+                    - **Speed:** {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)
+                    """)
+                    
+                    # Mark this file as successfully processed
+                    mark_upload_success(file_id)
+                    successful_files += 1
+                    
             except InterruptedError as e:
                 st.error(f"⚠️ Upload interrupted: {e}")
                 mark_upload_failed(file_id)
@@ -1241,7 +1280,7 @@ def render_document_library() -> None:
                     st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
                     if st.button(f"🗑️ Remove", key=f"remove_{i}"):
                         remove_document(i)
-                        st.rerun()
+                    st.rerun()
             
         else:
             st.info("🔍 No documents uploaded yet. Upload some documents above to get started!")
@@ -1262,44 +1301,55 @@ def clear_all_documents() -> None:
     print("🗑️ Cleared all documents and backups")
 
 
-def remove_document(idx: int) -> None:
-    """Remove a specific document by index from the combined document list"""
-    # Get the combined document list
-    all_documents = st.session_state.documents + st.session_state.uploaded_documents
-    
-    if idx >= len(all_documents):
-        print(f"❌ Invalid document index: {idx}")
+def remove_document(doc_id: int) -> None:
+    """Remove a specific document by database ID"""
+    try:
+        from .database.models import Document
+        from .database.connection import get_db_manager
+        
+        # Get document from database
+        document = Document.get_by_id(doc_id)
+        if not document:
+            print(f"❌ Document with ID {doc_id} not found")
         return
     
-    # Get the document to remove
-    doc_to_remove = all_documents[idx]
-    doc_name = doc_to_remove['name']
+        doc_name = document.name
+        
+        # Remove from database
+        db = get_db_manager()
+        db.execute_update("DELETE FROM documents WHERE id = ?", (doc_id,))
+        
+        # Also remove from session state if present
+        if 'uploaded_documents' in st.session_state:
+            st.session_state.uploaded_documents = [
+                doc for doc in st.session_state.uploaded_documents 
+                if doc.get('name') != doc_name
+            ]
+        
+        print(f"🗑️ Removed document from database: {doc_name}")
     
-    # Remove from appropriate collection
-    if doc_to_remove in st.session_state.documents:
-        st.session_state.documents.remove(doc_to_remove)
-        print(f"🗑️ Removed document from 'documents': {doc_name}")
-    elif doc_to_remove in st.session_state.uploaded_documents:
-        st.session_state.uploaded_documents.remove(doc_to_remove)
-        print(f"🗑️ Removed document from 'uploaded_documents': {doc_name}")
-    
-    # Update backup
-    backup_documents_data()
-    
-    print(f"🗑️ Removed document: {doc_name}")
+    except Exception as e:
+        print(f"❌ Error removing document: {e}")
+        raise
 
 
 def has_documents() -> bool:
-    """Check if any documents are uploaded"""
+    """Check if any documents are available in FAISS"""
+    # Check if FAISS documents exist
+    if 'faiss_documents' in st.session_state:
+        return len(st.session_state.faiss_documents) > 0
+    
+    # Fallback to old uploaded_documents check
     if 'uploaded_documents' in st.session_state:
         return len(st.session_state.uploaded_documents) > 0
+    
     return False
 
 
 def get_document_count() -> int:
     """Get the total number of uploaded documents"""
-    if 'uploaded_documents' in st.session_state:
-        return len(st.session_state.uploaded_documents) 
+    if 'faiss_documents' in st.session_state:
+        return len(st.session_state.faiss_documents)
     return 0
 
 

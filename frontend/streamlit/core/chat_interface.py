@@ -5,8 +5,172 @@ Handles chat functionality, welcome screen, and user interactions
 
 import streamlit as st
 import html
+import json
+import time
 from typing import List, Dict, Any
+from datetime import datetime
+import os
+
+# Import utilities
 from .utils import cosine_similarity, get_context_type
+from .llamastack_client import LlamaStackClient
+from .config import MAX_CHAT_HISTORY
+
+def initialize_chat_history():
+    """Initialize chat history from persistent storage"""
+    # Always try to load from SQLite if we have a user_id
+    try:
+        from .database.connection import get_db_manager
+        db = get_db_manager()
+        
+        user_id = st.session_state.get('user_id')
+        if user_id:
+            # Get chat sessions for this user
+            results = db.execute_query(
+                "SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+                (user_id,)
+            )
+            
+            if results:
+                latest_session = results[0]
+                session_id = latest_session['id']
+                
+                # Get messages for this session
+                messages = db.execute_query(
+                    "SELECT * FROM chat_messages WHERE chat_session_id = ? ORDER BY timestamp ASC",
+                    (session_id,)
+                )
+                
+                # Clear existing chat history and reload from database
+                st.session_state.chat_history = []
+                
+                for msg in messages:
+                    print(f"🔍 DEBUG: Raw message from DB: {dict(msg)}")
+                    
+                    message_data = {
+                        'role': msg['role'],
+                        'content': msg['content'],
+                        'timestamp': msg['timestamp']
+                    }
+                    
+                    # Parse additional data if available
+                    if 'metadata' in msg and msg['metadata']:
+                        try:
+                            metadata = json.loads(msg['metadata'])
+                            message_data['sources'] = metadata.get('sources', [])
+                            message_data['models_used'] = metadata.get('models_used', {})
+                            print(f"🔍 DEBUG: Loaded message with metadata - sources: {len(message_data['sources'])}, models: {message_data['models_used']}")
+                        except Exception as e:
+                            print(f"⚠️ Could not parse metadata: {e}")
+                            print(f"⚠️ Raw metadata string: '{msg['metadata']}'")
+                    else:
+                        print(f"🔍 DEBUG: Loaded message without metadata - metadata field: '{msg.get('metadata', 'None')}'")
+                    
+                    st.session_state.chat_history.append(message_data)
+                
+                print(f"✅ Loaded {len(st.session_state.chat_history)} messages from persistent storage")
+                return
+        
+        # If no user_id or no session found, ensure chat_history exists
+        if 'chat_history' not in st.session_state:
+            st.session_state.chat_history = []
+            
+    except Exception as e:
+        print(f"⚠️ Could not load chat history: {e}")
+        # Ensure chat_history exists even if loading fails
+        if 'chat_history' not in st.session_state:
+            st.session_state.chat_history = []
+
+def save_chat_history():
+    """Save chat history to persistent storage"""
+    try:
+        from .database.connection import get_db_manager
+        db = get_db_manager()
+        
+        user_id = st.session_state.get('user_id')
+        if not user_id:
+            return
+            
+        if not st.session_state.get('chat_history'):
+            return
+        
+        # Get or create chat session
+        session_results = db.execute_query(
+            "SELECT id FROM chat_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (user_id,)
+        )
+        
+        if session_results:
+            session_id = session_results[0]['id']
+        else:
+            # Create new session
+            session_id = db.execute_insert(
+                "INSERT INTO chat_sessions (user_id, created_at) VALUES (?, ?)",
+                (user_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            )
+        
+        # Clear existing messages for this session and save current state
+        db.execute_update("DELETE FROM chat_messages WHERE chat_session_id = ?", (session_id,))
+        
+        # Save current messages
+        saved_count = 0
+        for message in st.session_state.chat_history:
+            # Convert float32 values to regular floats for JSON serialization
+            sources = message.get('sources', [])
+            if sources:
+                for source in sources:
+                    if 'score' in source and hasattr(source['score'], 'item'):
+                        source['score'] = float(source['score'])
+            
+            models_used = message.get('models_used', {})
+            
+            metadata = {
+                'sources': sources,
+                'models_used': models_used
+            }
+            
+            metadata_json = json.dumps(metadata)
+            
+            # Debug: Check if we're saving metadata
+            if sources or models_used:
+                print(f"🔍 DEBUG: Saving message with metadata - sources: {len(sources)}, models: {models_used}")
+            
+            db.execute_insert(
+                "INSERT INTO chat_messages (chat_session_id, role, content, metadata, timestamp) VALUES (?, ?, ?, ?, ?)",
+                (session_id, message['role'], message['content'], metadata_json, message.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            )
+            saved_count += 1
+        
+        print(f"✅ Saved {saved_count} messages to persistent storage")
+        
+    except Exception as e:
+        print(f"⚠️ Could not save chat history: {e}")
+
+def add_message_to_history(message: Dict[str, Any]):
+    """Add message to chat history and save to persistent storage"""
+    # Add timestamp if not present
+    if 'timestamp' not in message:
+        message['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Ensure we have a copy of the message with all fields
+    message_copy = message.copy()
+    
+    print(f"🔍 DEBUG: Adding message to history: {message_copy}")
+    
+    st.session_state.chat_history.append(message_copy)
+    
+    # Keep only last MAX_CHAT_HISTORY messages
+    if len(st.session_state.chat_history) > MAX_CHAT_HISTORY:
+        st.session_state.chat_history = st.session_state.chat_history[-MAX_CHAT_HISTORY:]
+    
+    # Only save to persistent storage for assistant messages (complete conversation pairs)
+    if message['role'] == 'assistant':
+        # Ensure the message has metadata before saving
+        if 'sources' in message or 'models_used' in message:
+            print(f"🔍 DEBUG: Saving assistant message with metadata")
+            save_chat_history()
+        else:
+            print(f"🔍 DEBUG: Assistant message has no metadata, not saving")
 
 
 def render_welcome_screen() -> None:
@@ -94,6 +258,9 @@ def render_welcome_screen() -> None:
 
 def render_chat_interface() -> None:
     """Display the main chat interface with proper chat layout"""
+    # Initialize persistent chat history
+    initialize_chat_history()
+    
     # Clean chat styling
     st.markdown("""
     <style>
@@ -160,26 +327,31 @@ def render_chat_interface() -> None:
     .message-metadata {
         margin-top: 0.5rem;
         font-size: 0.75em;
-        opacity: 0.7;
+        opacity: 0.8;
+        color: #666 !important;
     }
     
     .source-tag {
         display: inline-block;
-        background: var(--secondary-background, #e9ecef);
+        background: #e9ecef;
+        color: #495057 !important;
         padding: 0.2rem 0.4rem;
         border-radius: 8px;
         margin-right: 0.3rem;
         margin-bottom: 0.2rem;
         font-size: 0.7em;
+        border: 1px solid #dee2e6;
     }
     
     .model-info {
         margin-top: 0.4rem;
         padding: 0.3rem 0.5rem;
-        background: var(--info-background, #f8f9fa);
+        background: #f8f9fa;
+        color: #495057 !important;
         border-radius: 6px;
         font-size: 0.7em;
-        border-left: 3px solid var(--info-color, #17a2b8);
+        border-left: 3px solid #17a2b8;
+        border: 1px solid #dee2e6;
     }
     
     /* Improve input field readability */
@@ -287,14 +459,14 @@ def process_user_query(query: str) -> None:
     print(f"🔍 DEBUG: Processing query: '{query}'")
     
     # Add user message to chat history immediately
-    st.session_state.chat_history.append({
+    add_message_to_history({
         'role': 'user',
         'content': query
     })
     
     # Get current models being used (define at top for all cases)
     embedding_model = "all-MiniLM-L6-v2"  # Fixed embedding model
-    llm_model = st.session_state.selected_llm_model
+    llm_model = st.session_state.get('selected_llm_model', 'llama3.2:1b')  # Fallback to default
     
     print(f"🔍 DEBUG: Using models - embedding: {embedding_model}, llm: {llm_model}")
     
@@ -302,14 +474,20 @@ def process_user_query(query: str) -> None:
     total_documents = 0
     if 'documents' in st.session_state:
         total_documents += len(st.session_state.documents)
-    if 'uploaded_documents' in st.session_state:
-        total_documents += len(st.session_state.uploaded_documents)
+    if 'faiss_documents' in st.session_state:
+        total_documents += len(st.session_state.faiss_documents)
     
-    print(f"🔍 DEBUG: Total documents available: {total_documents}")
+    # Also check if FAISS index has data
+    has_faiss_data = (
+        'faiss_index' in st.session_state and 
+        'faiss_chunks' in st.session_state and 
+        st.session_state.faiss_index.ntotal > 0 and 
+        len(st.session_state.faiss_chunks) > 0
+    )
     
-    if total_documents == 0:
+    if total_documents == 0 and not has_faiss_data:
         print("❌ DEBUG: No documents available for search")
-        st.session_state.chat_history.append({
+        add_message_to_history({
             'role': 'assistant',
             'content': "I don't have any documents to search. Please upload some documents or process web URLs first using the sidebar.",
             'models_used': {
@@ -376,16 +554,18 @@ def process_user_query(query: str) -> None:
                         }
                     }
                     
+                    print(f"🔍 DEBUG: Created assistant response with sources: {len(sources)}, models: {assistant_response['models_used']}")
+                    
                     # Add debug info if using dummy embeddings
                     if not is_real_embedding:
                         assistant_response['debug_info'] = "Using demo embeddings - consider installing docling or configuring real embedding models"
                     
-                    st.session_state.chat_history.append(assistant_response)
+                    add_message_to_history(assistant_response)
                 else:
                     print("❌ DEBUG: No relevant chunks found")
                     
                     # No relevant chunks found
-                    st.session_state.chat_history.append({
+                    add_message_to_history({
                         'role': 'assistant',
                         'content': f"I couldn't find relevant information about '{query}' in your uploaded documents. Try rephrasing your question or upload more relevant documents.",
                         'models_used': {
@@ -398,7 +578,7 @@ def process_user_query(query: str) -> None:
                 print("❌ DEBUG: Failed to get query embeddings")
                 
                 # Embedding generation failed
-                st.session_state.chat_history.append({
+                add_message_to_history({
                     'role': 'assistant',
                     'content': "I'm having trouble processing your question right now. Please check if your embedding model is working correctly.",
                     'models_used': {
@@ -414,7 +594,7 @@ def process_user_query(query: str) -> None:
         print(f"❌ DEBUG: Full traceback: {traceback.format_exc()}")
         
         # Error handling with model info
-        st.session_state.chat_history.append({
+        add_message_to_history({
             'role': 'assistant',
             'content': f"I encountered an error while processing your question: {str(e)}",
             'models_used': {
@@ -424,13 +604,94 @@ def process_user_query(query: str) -> None:
             }
         })
     
-    # Limit chat history to prevent memory issues
-    if len(st.session_state.chat_history) > 50:  # Keep last 50 messages
-        st.session_state.chat_history = st.session_state.chat_history[-50:]
+    # Chat history limiting is now handled in add_message_to_history function
 
 
 def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> List[Dict]:
-    """Find most relevant document chunks using improved retrieval with filtering and reranking"""
+    """Find relevant chunks using FAISS similarity search"""
+    from .config import MIN_SIMILARITY_THRESHOLD, MAX_RELEVANT_CHUNKS
+    
+    if top_k is None:
+        top_k = MAX_RELEVANT_CHUNKS
+    
+    relevant_chunks = []
+    
+    # Check if FAISS index is available
+    if 'faiss_index' not in st.session_state or 'faiss_chunks' not in st.session_state:
+        print("❌ DEBUG: FAISS index or chunks not available")
+        return []
+    
+    try:
+        # Use FAISS for similarity search
+        faiss_index = st.session_state.faiss_index
+        faiss_chunks = st.session_state.faiss_chunks
+        
+        if faiss_index.ntotal == 0:
+            print("❌ DEBUG: FAISS index is empty")
+            return []
+        
+        # Convert query embedding to numpy array
+        import numpy as np
+        query_vector = np.array([query_embedding], dtype='float32')
+        
+        # Search FAISS index
+        distances, indices = faiss_index.search(query_vector, min(top_k * 2, faiss_index.ntotal))
+        
+        print(f"🔍 DEBUG: FAISS search returned {len(indices[0])} results")
+        
+        # Process results
+        for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
+            if idx < len(faiss_chunks):
+                chunk_data = faiss_chunks[idx]
+                
+                # Debug: Print chunk data structure
+                print(f"🔍 DEBUG: Chunk {idx} data keys: {list(chunk_data.keys())}")
+                print(f"🔍 DEBUG: Chunk {idx} document_name: {chunk_data.get('document_name', 'NOT_FOUND')}")
+                
+                # Convert distance to similarity (FAISS uses L2 distance, so we need to convert)
+                # For L2 distance, similarity = 1 / (1 + distance)
+                similarity = 1.0 / (1.0 + distance)
+                
+                print(f"🔍 DEBUG: Chunk {idx} similarity: {similarity:.4f} (distance: {distance:.4f})")
+                
+                # Filter by similarity threshold
+                if similarity >= MIN_SIMILARITY_THRESHOLD:
+                    # Get document metadata for source URL
+                    source_url = None
+                    doc_id = chunk_data.get('document_id')
+                    if doc_id and 'faiss_documents' in st.session_state:
+                        for doc in st.session_state.faiss_documents:
+                            if doc.get('id') == doc_id:
+                                source_url = doc.get('source_url')
+                                break
+                    
+                    chunk_info = {
+                        'content': chunk_data.get('text', ''),
+                        'document': chunk_data.get('document_name', 'Unknown'),
+                        'similarity': similarity,
+                        'chunk_index': chunk_data.get('chunk_index', idx),
+                        'doc_name': chunk_data.get('document_name', 'Unknown'),
+                        'doc_type': 'FAISS',  # All FAISS documents
+                        'source_url': source_url
+                    }
+                    relevant_chunks.append(chunk_info)
+                    print(f"✅ DEBUG: Added chunk {idx} from {chunk_data.get('document_name', 'Unknown')} (similarity: {similarity:.4f})")
+                else:
+                    print(f"❌ DEBUG: Chunk {idx} below threshold ({similarity:.4f} < {MIN_SIMILARITY_THRESHOLD})")
+        
+        # Sort by similarity
+        relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
+        
+        print(f"🔍 DEBUG: Found {len(relevant_chunks)} relevant chunks total")
+        return relevant_chunks[:top_k]
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in FAISS search: {e}")
+        return []
+
+
+def find_relevant_chunks_fallback(query_embedding: List[float], top_k: int = None) -> List[Dict]:
+    """Fallback method using document-based search when FAISS is not available"""
     from .config import MAX_RELEVANT_CHUNKS, MIN_SIMILARITY_THRESHOLD, ENABLE_CHUNK_RERANKING
     
     if top_k is None:
@@ -447,9 +708,9 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
         print(f"🔍 DEBUG: Found {len(st.session_state.documents)} regular documents")
     
     # Add uploaded documents (including web URLs)
-    if 'uploaded_documents' in st.session_state:
-        all_documents.extend(st.session_state.uploaded_documents)
-        print(f"🔍 DEBUG: Found {len(st.session_state.uploaded_documents)} uploaded documents (including web URLs)")
+    if 'faiss_documents' in st.session_state:
+        all_documents.extend(st.session_state.faiss_documents)
+        print(f"🔍 DEBUG: Found {len(st.session_state.faiss_documents)} FAISS documents (including web URLs)")
     
     print(f"🔍 DEBUG: Total documents to search: {len(all_documents)}")
     
@@ -810,6 +1071,27 @@ def generate_enhanced_content_response(query: str, chunks: List[Dict]) -> str:
 def clear_chat_history() -> None:
     """Clear the chat history"""
     st.session_state.chat_history = []
+    
+    # Also clear from persistent storage
+    try:
+        from .database.connection import get_db_manager
+        db = get_db_manager()
+        
+        user_id = st.session_state.get('user_id')
+        if user_id:
+            # Get current session and clear its messages
+            session_results = db.execute_query(
+                "SELECT id FROM chat_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+                (user_id,)
+            )
+            
+            if session_results:
+                session_id = session_results[0]['id']
+                db.execute_update("DELETE FROM chat_messages WHERE chat_session_id = ?", (session_id,))
+                print("✅ Cleared chat history from persistent storage")
+                
+    except Exception as e:
+        print(f"⚠️ Could not clear persistent chat history: {e}")
 
 
 def get_chat_history_count() -> int:

@@ -91,6 +91,11 @@ data/documents/*
 data/vectors/*
 data/models/*
 data/cache/*
+data/auth_session.json
+data/rag_llamastack.db
+data/faiss/*.faiss
+data/faiss/*.pkl
+data/telemetry/*.db
 !data/documents/.gitkeep
 !data/vectors/.gitkeep
 !data/models/.gitkeep
