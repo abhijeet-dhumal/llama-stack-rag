@@ -102,115 +102,65 @@ make start-frontend
 
 ## 🏛️ **System Architecture**
 
-### **Current Streamlit-Only Architecture**
+### **High-Level Architecture**
 
 ```mermaid
 graph TB
-    subgraph "🎨 Frontend Layer (Streamlit)"
-        UI[📱 Main Interface<br/>Port: 8501<br/>Config: .streamlit/config.toml]
-        SIDEBAR[🔧 Control Sidebar<br/>Theme: Dark/Light<br/>Upload: 50MB max]
-        CHAT[💬 Chat Interface<br/>History: Session State<br/>Context: 6000 chars]
-        UPLOAD[📁 File Upload<br/>Formats: PDF,DOCX,PPTX,TXT,MD<br/>Chunk: 3000+600 overlap]
-        WEB_URL[🌐 Web URL Input<br/>Timeout: 30s<br/>Size: 50MB limit]
-        STATUS[🔌 System Status<br/>Health: Real-time<br/>Models: Ollama + LlamaStack]
-        DIAG[🩺 Diagnostics<br/>Connection: Auto-detect<br/>Endpoints: 8321, 11434]
+    subgraph "🎨 Frontend (Streamlit)"
+        UI[📱 Web Interface<br/>Port: 8501<br/>Dark/Light Theme<br/>Responsive Design]
+        UPLOAD[📁 File Upload<br/>PDF, DOCX, PPTX, TXT, MD<br/>Max 50MB per file]
+        WEB_URL[🌐 Web URL Processing<br/>MCP Server + BeautifulSoup<br/>Real-time extraction]
+        CHAT[💬 Chat Interface<br/>Session State<br/>Source Citations]
     end
     
     subgraph "🧠 Core Processing"
-        DOC_HANDLER[📄 Document Handler<br/>Embedding: all-MiniLM-L6-v2<br/>Similarity: Cosine + 0.25 threshold]
+        DOC_HANDLER[📄 Document Handler<br/>Multi-format extraction<br/>Smart chunking 3000+600]
         WEB_PROC[🌐 Web Content Processor<br/>MCP: just-every mcp-read-website-fast<br/>Fallback: BeautifulSoup]
-        CHAT_ENGINE[💬 Chat Engine<br/>Temperature: 0.4<br/>Max Tokens: 1024]
-        MODEL_MGR[🤖 Model Manager<br/>Filter: Ollama-only models<br/>Status: Real-time polling]
-        THEME_MGR[🎨 Theme Manager<br/>CSS: Custom styles<br/>Responsive: Mobile-friendly]
+        CHAT_ENGINE[💬 Chat Engine<br/>RAG pipeline<br/>Context building]
+        MODEL_MGR[🤖 Model Manager<br/>Ollama integration<br/>Real-time status]
     end
     
-    subgraph "🌐 Web Content Processing"
-        MCP_SERVER[🔧 MCP Server<br/>Command: fetch<br/>Output: markdown json<br/>Timeout: 30s]
-        BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Parser: html parser<br/>Clean: markdownify]
-        WEB_EXTRACT[📝 Content Extraction<br/>Readability: Mozilla<br/>Metadata: Title, URL]
-        URL_VALIDATE[✅ URL Validation<br/>Schemes: http https<br/>Format: urlparse]
-    end
-    
-    subgraph "🦙 LlamaStack Integration"
-        LS_CLIENT[🔗 LlamaStack Client<br/>Port: 8321<br/>Config: llamastack-config.yaml]
-        EMBED_API[🧮 Embeddings API<br/>Model: all-MiniLM-L6-v2<br/>Dimensions: 384]
-        CHAT_API[💬 Chat Completion API<br/>Provider: ollama<br/>Fallback: demo]
-        HEALTH_API[💓 Health Check API<br/>Endpoint: /v1/health<br/>Status: 200 OK]
-    end
-    
-    subgraph "🏠 Local AI (Ollama)"
-        OLLAMA[🦙 Ollama Server<br/>Port: 11434<br/>Config: ollama-example.yaml]
-        LOCAL_LLM[🤖 Local LLM Models<br/>Default: llama3.2:1b<br/>Alternative: llama3.2:3b]
-        MODEL_PULL[⬇️ Model Management<br/>Command: ollama pull<br/>Cache: .ollama]
+    subgraph "🦙 AI Backend"
+        LS_CLIENT[🔗 LlamaStack Client<br/>Port: 8321<br/>Unified API]
+        EMBED_API[🧮 Embeddings<br/>all-MiniLM-L6-v2<br/>384 dimensions]
+        CHAT_API[💬 Chat Completion<br/>Ollama provider<br/>Fallback systems]
+        OLLAMA[🦙 Ollama Server<br/>Port: 11434<br/>Local LLM models]
     end
     
     subgraph "💾 Storage & State"
-        SESSION[🔄 Session State<br/>Persistence: Browser<br/>Cleanup: Auto]
-        VECTOR_DB[🗄️ Vector Storage<br/>Format: JSON<br/>Location: Session]
-        DOC_STORE[📊 Document Storage<br/>Backup: Auto-save<br/>Restore: On reload]
-        CACHE[⚡ Performance Cache<br/>TTL: Session<br/>Size: <50MB]
+        SESSION[🔄 Session State<br/>Browser persistence<br/>Auto cleanup]
+        VECTOR_DB[🗄️ Vector Storage<br/>JSON format<br/>Session-based]
+        DOC_STORE[📊 Document Storage<br/>Auto-save<br/>Restore on reload]
     end
     
-    subgraph "🔍 Debug & Monitoring"
-        DEBUG_LOG[📝 Debug Logging<br/>Level: INFO/DEBUG<br/>Output: Console]
-        ERROR_HANDLE[🛠️ Error Handling<br/>Type: Auto-convert<br/>Fallback: Graceful]
-        TYPE_CONVERT[🔄 Type Conversion<br/>Numpy to List<br/>Array to Scalar]
-    end
-    
-    %% User Interactions
-    UI --> SIDEBAR
-    SIDEBAR --> STATUS
-    SIDEBAR --> UPLOAD
-    SIDEBAR --> WEB_URL
-    SIDEBAR --> DIAG
+    %% User Flow
+    UI --> UPLOAD
+    UI --> WEB_URL
     UI --> CHAT
     
-    %% Core Processing Flow
+    %% Processing Flow
     UPLOAD --> DOC_HANDLER
     WEB_URL --> WEB_PROC
     CHAT --> CHAT_ENGINE
-    STATUS --> MODEL_MGR
-    DIAG --> MODEL_MGR
     
-    %% Web Processing Flow
-    WEB_PROC --> MCP_SERVER
-    MCP_SERVER --> WEB_EXTRACT
-    WEB_PROC --> BEAUTIFUL_SOUP
-    WEB_PROC --> URL_VALIDATE
-    WEB_EXTRACT --> DOC_HANDLER
-    
-    %% LlamaStack Integration
+    %% AI Integration
     DOC_HANDLER --> LS_CLIENT
+    WEB_PROC --> LS_CLIENT
     CHAT_ENGINE --> LS_CLIENT
-    MODEL_MGR --> LS_CLIENT
     LS_CLIENT --> EMBED_API
     LS_CLIENT --> CHAT_API
-    LS_CLIENT --> HEALTH_API
+    LS_CLIENT --> OLLAMA
     
-    %% Ollama Fallback
-    LS_CLIENT -.->|Fallback| OLLAMA
-    MODEL_MGR --> OLLAMA
-    OLLAMA --> LOCAL_LLM
-    OLLAMA --> MODEL_PULL
-    
-    %% Storage Layer
+    %% Storage
     DOC_HANDLER --> SESSION
     CHAT_ENGINE --> SESSION
     SESSION --> VECTOR_DB
     SESSION --> DOC_STORE
-    SESSION --> CACHE
-    
-    %% Debug Layer
-    CHAT_ENGINE --> DEBUG_LOG
-    DOC_HANDLER --> ERROR_HANDLE
-    CHAT_ENGINE --> TYPE_CONVERT
     
     style UI fill:#e3f2fd
     style LS_CLIENT fill:#fff3e0
     style OLLAMA fill:#e8f5e8
     style SESSION fill:#fce4ec
-    style MCP_SERVER fill:#fff8e1
-    style DEBUG_LOG fill:#f3e5f5
 ```
 
 ### **Technology Stack**
@@ -219,7 +169,7 @@ graph TB
 graph LR
     subgraph "🖥️ Frontend"
         ST[Streamlit 1.28+]
-        CSS[Custom CSS/JS]
+        CSS[Bootstrap 5.3.0]
         PD[Pandas DataFrames]
     end
     
@@ -235,7 +185,6 @@ graph LR
         ST_EMB[Sentence Transformers]
         OL[Ollama]
         HF[Hugging Face]
-        NP[NumPy]
     end
     
     subgraph "📊 Data Processing"
@@ -248,8 +197,7 @@ graph LR
     subgraph "🔧 Infrastructure"
         PY[Python 3.12+]
         SUB[Subprocess]
-        OS[OS Integration]
-        NODE[Node.js]
+        NODE[Node.js 16+]
     end
     
     ST --> LS
@@ -261,220 +209,54 @@ graph LR
     BS --> MD
     LS --> ST_EMB
     LS --> OL
-    ST_EMB --> NP
+    ST_EMB --> HF
     DOC --> PDF
     DOC --> CHUNK
     ST --> DOC
     MCP --> NODE
 ```
 
----
-
-## 🔄 **Data Flow & Processing**
-
-### **Document Processing Pipeline**
+### **Data Flow Overview**
 
 ```mermaid
 flowchart TD
-    START([📁 File Upload<br/>Port: 8501<br/>Max: 50MB<br/>Formats: PDF,DOCX,PPTX,TXT,MD]) --> VALIDATE{🔍 Validation<br/>Size: <50MB<br/>Type: Allowed formats<br/>Config: .streamlit/config.toml}
+    subgraph "📥 Input Sources"
+        FILES[📁 File Upload<br/>PDF, DOCX, PPTX, TXT, MD<br/>Max 50MB]
+        URLS[🌐 Web URLs<br/>MCP Server + Fallback<br/>Real-time extraction]
+    end
     
-    VALIDATE -->|✅ Valid| STATE_TRACK[🔄 State Tracking<br/>Mark as uploading<br/>Session: st.session_state<br/>Backup: Auto-save]
-    VALIDATE -->|❌ Invalid| ERROR[❌ Error Display<br/>Size/type limits<br/>User feedback]
+    subgraph "🔄 Processing Pipeline"
+        EXTRACT[📄 Content Extraction<br/>Multi-format support<br/>Docling + PyPDF2]
+        CHUNK[✂️ Smart Chunking<br/>3000 chars + 600 overlap<br/>Optimized for RAG]
+        EMBED[🧮 Embedding Generation<br/>all-MiniLM-L6-v2<br/>384 dimensions]
+        STORE[💾 Vector Storage<br/>Session state<br/>JSON format]
+    end
     
-    STATE_TRACK --> EXTRACT[📄 Content Extraction<br/>Multi-format support<br/>Docling: PDF processing<br/>PyPDF2: PDF parsing<br/>python-docx: DOCX]
-    EXTRACT --> OPTIMIZE[🚀 Performance Optimization<br/>Large file handling<br/>Batch: 10 chunks<br/>Memory: <50MB session]
+    subgraph "🔍 Query Processing"
+        QUERY[💬 User Question<br/>Natural language<br/>Real-time]
+        SEARCH[🔍 Semantic Search<br/>Cosine similarity<br/>Top 4 chunks]
+        CONTEXT[📝 Context Building<br/>6000 char limit<br/>Source citations]
+        RESPONSE[🤖 AI Response<br/>LlamaStack + Ollama<br/>Fallback systems]
+    end
     
-    OPTIMIZE --> CHUNK[✂️ Smart Chunking<br/>3000 chars + 600 overlap<br/>Config: config.py<br/>CHARS_PER_CHUNK: 3000<br/>CHUNK_OVERLAP: 600]
-    CHUNK --> BATCH[📦 Batch Processing<br/>Optimized embedding generation<br/>Parallel: 3 requests<br/>Timeout: 30s per batch]
+    %% Processing Flow
+    FILES --> EXTRACT
+    URLS --> EXTRACT
+    EXTRACT --> CHUNK
+    CHUNK --> EMBED
+    EMBED --> STORE
     
-    BATCH --> EMBED[🧮 Generate Embeddings<br/>all-MiniLM-L6-v2<br/>Port: 8321<br/>Dimensions: 384<br/>Model: sentence-transformers]
-    EMBED --> QUALITY[🎯 Quality Check<br/>Validate embeddings<br/>Type: List/Array<br/>Conversion: Numpy to List<br/>Error: Graceful fallback]
+    %% Query Flow
+    QUERY --> SEARCH
+    SEARCH --> CONTEXT
+    CONTEXT --> RESPONSE
+    STORE --> SEARCH
     
-    QUALITY -->|✅ Success| STORE[💾 Store Document<br/>Session state + backup<br/>Location: st.session_state<br/>Format: JSON<br/>Persistence: Browser]
-    QUALITY -->|⚠️ Partial| FALLBACK[🧪 Dummy Embeddings<br/>Ensure functionality<br/>Random: 384 dimensions<br/>Status: Demo mode]
-    
-    STORE --> METRICS[📊 Performance Metrics<br/>Speed, quality, stats<br/>Processing time<br/>Chunk count<br/>Embedding success rate]
-    FALLBACK --> METRICS
-    METRICS --> COMPLETE([✅ Processing Complete<br/>Status: Ready for chat<br/>Storage: Session state])
-    
-    STATE_TRACK -.->|Interruption| RETRY[🔄 Mark for Retry<br/>State management<br/>Failed uploads set<br/>Retry mechanism]
-    RETRY -.-> STATE_TRACK
-    
-    style START fill:#e1f5fe
-    style COMPLETE fill:#e8f5e8
-    style EMBED fill:#fff3e0
-    style METRICS fill:#f3e5f5
-    style ERROR fill:#ffebee
-```
-
-### **Chat & Query Processing**
-
-```mermaid
-flowchart TD
-    QUERY([💬 User Question<br/>Interface: Streamlit Chat<br/>Port: 8501<br/>History: Session state]) --> CHECK{📊 Documents Available?<br/>Session: st.session_state<br/>Collections: documents + uploaded_documents<br/>Count: Real-time check}
-    
-    CHECK -->|❌ No| NO_DOCS[📝 No Documents Message<br/>Upload prompt<br/>UI: Sidebar guidance<br/>Status: Ready for upload]
-    CHECK -->|✅ Yes| EMBED_Q[🧮 Query Embedding<br/>all-MiniLM-L6-v2<br/>Port: 8321<br/>Dimensions: 384<br/>Model: sentence-transformers]
-    
-    EMBED_Q --> SEARCH[🔍 Similarity Search<br/>Cosine similarity<br/>Algorithm: dot product magnitudes<br/>Type: Auto-convert arrays<br/>Debug: Logged similarity scores]
-    SEARCH --> FILTER[🎯 Relevance Filtering<br/>Threshold: 0.25<br/>Config: MIN_SIMILARITY_THRESHOLD<br/>Chunks: Top 4 relevant<br/>Diversity: Source balancing]
-    
-    FILTER --> RERANK[📊 Chunk Reranking<br/>Diversity + relevance<br/>Sources: Files + Web URLs<br/>Priority: Recent uploads<br/>Limit: 4 chunks max]
-    RERANK --> CONTEXT[📝 Context Building<br/>6000 char limit<br/>Config: LLM_MAX_TOKENS<br/>Format: System + Context + Query<br/>Citations: Source attribution]
-    
-    CONTEXT --> PROMPT[📋 Prompt Engineering<br/>System + context + query<br/>Template: config.py<br/>Temperature: 0.4<br/>Max tokens: 1024]
-    PROMPT --> TRY_LS[🦙 Try LlamaStack<br/>Multiple endpoints<br/>Port: 8321<br/>Config: llamastack-config.yaml<br/>Provider: ollama]
-    
-    TRY_LS -->|✅ Success| RESPONSE[📤 AI Response<br/>With citations<br/>Format: Markdown<br/>Sources: Top 3 documents<br/>History: Session persistence]
-    TRY_LS -->|❌ Failed| TRY_OLLAMA[🏠 Try Ollama Fallback<br/>Local processing<br/>Port: 11434<br/>Config: ollama-example.yaml<br/>Model: llama3.2:1b/3b]
-    
-    TRY_OLLAMA -->|✅ Success| RESPONSE
-    TRY_OLLAMA -->|❌ Failed| FALLBACK_RESP[🧪 Demo Response<br/>Educational content<br/>Status: Demo mode<br/>No backend required<br/>Sample responses]
-    
-    RESPONSE --> HISTORY[💾 Chat History<br/>Session persistence<br/>Storage: st.session_state<br/>Format: List of dicts<br/>Cleanup: Auto on session end]
-    FALLBACK_RESP --> HISTORY
-    NO_DOCS --> HISTORY
-    
-    style QUERY fill:#e1f5fe
+    style FILES fill:#e1f5fe
+    style URLS fill:#e1f5fe
     style RESPONSE fill:#e8f5e8
-    style EMBED_Q fill:#fff3e0
+    style EMBED fill:#fff3e0
     style SEARCH fill:#f3e5f5
-    style NO_DOCS fill:#ffebee
-```
-
-### **Web Content Processing Pipeline**
-
-```mermaid
-flowchart TD
-    URL_INPUT([🌐 Web URL Input<br/>Interface: Sidebar tab<br/>Port: 8501<br/>Validation: urlparse]) --> URL_VALIDATE{🔍 URL Validation<br/>Schemes: http https<br/>Format: urlparse<br/>Domain: netloc check<br/>Config: WebContentProcessor}
-    
-    URL_VALIDATE -->|❌ Invalid| URL_ERROR[❌ Invalid URL Error<br/>Format check<br/>User feedback<br/>UI: Error message]
-    URL_VALIDATE -->|✅ Valid| MCP_TRY[🔧 Try MCP Server<br/>just-every mcp-read-website-fast<br/>Command: fetch<br/>Output: markdown<br/>Timeout: 30s]
-    
-    MCP_TRY -->|✅ Success| MCP_EXTRACT[📝 MCP Extraction<br/>Mozilla Readability<br/>Clean: markdown output<br/>Metadata: title, url<br/>Size: <50MB limit]
-    MCP_TRY -->|❌ Failed| BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Direct HTML parsing<br/>Parser: html.parser<br/>Clean: markdownify<br/>Timeout: 30s]
-    
-    MCP_EXTRACT --> CONTENT_CHECK{📄 Content Quality?<br/>Length: >100 chars<br/>Text: Readable content<br/>Blocked: robots.txt<br/>Empty: No content}
-    BEAUTIFUL_SOUP --> CONTENT_CHECK
-    
-    CONTENT_CHECK -->|❌ Poor| CONTENT_ERROR[❌ Poor Content Error<br/>Empty/blocked<br/>User feedback<br/>Status: Processing failed]
-    CONTENT_CHECK -->|✅ Good| SIZE_CHECK{📏 Size Check<br/>Limit: 50MB<br/>Config: MAX_CONTENT_SIZE<br/>Memory: Session state<br/>Chunk: If large}
-    
-    SIZE_CHECK -->|❌ Too Large| SIZE_ERROR[❌ Size Limit Error<br/>>50MB<br/>User feedback<br/>Suggestion: Try smaller URL]
-    SIZE_CHECK -->|✅ OK| WEB_CHUNK[✂️ Web Content Chunking<br/>Smart segmentation<br/>Config: CHARS_PER_CHUNK: 3000<br/>Overlap: 600 chars<br/>Format: Markdown]
-    
-    WEB_CHUNK --> WEB_EMBED[🧮 Web Embedding Generation<br/>all-MiniLM-L6-v2<br/>Port: 8321<br/>Dimensions: 384<br/>Model: sentence-transformers]
-    WEB_EMBED --> WEB_STORE[💾 Store Web Content<br/>Unified with files<br/>Session: st.session_state<br/>Collection: uploaded_documents<br/>Type: WEB]
-    
-    WEB_STORE --> WEB_METRICS[📊 Web Processing Metrics<br/>Speed, quality, source<br/>Processing time<br/>Content size<br/>Source: MCP/BeautifulSoup]
-    WEB_METRICS --> WEB_COMPLETE([✅ Web Processing Complete<br/>Status: Ready for chat<br/>Storage: Session state<br/>Search: Unified retrieval])
-    
-    URL_ERROR --> WEB_COMPLETE
-    CONTENT_ERROR --> WEB_COMPLETE
-    SIZE_ERROR --> WEB_COMPLETE
-    
-    style URL_INPUT fill:#e1f5fe
-    style WEB_COMPLETE fill:#e8f5e8
-    style MCP_EXTRACT fill:#fff8e1
-    style WEB_EMBED fill:#fff3e0
-    style WEB_STORE fill:#f3e5f5
-    style URL_ERROR fill:#ffebee
-    style CONTENT_ERROR fill:#ffebee
-    style SIZE_ERROR fill:#ffebee
-```
-
-### **System Configuration & Ports**
-
-```mermaid
-graph TB
-    subgraph "🌐 User Interface"
-        BROWSER[🌐 Browser<br/>URL: http://localhost:8501<br/>Interface: Streamlit Web App<br/>Theme: Dark/Light toggle]
-    end
-    
-    subgraph "📱 Streamlit Frontend"
-        STREAMLIT[📱 Streamlit Server<br/>Port: 8501<br/>Config: .streamlit/config.toml<br/>Max Upload: 50MB<br/>Theme: Custom CSS]
-    end
-    
-    subgraph "🦙 LlamaStack Backend"
-        LLAMASTACK[🦙 LlamaStack Server<br/>Port: 8321<br/>Config: llamastack/config/llamastack-config.yaml<br/>APIs: inference, embeddings, health<br/>Provider: ollama]
-    end
-    
-    subgraph "🏠 Ollama Local AI"
-        OLLAMA_SERVER[🦙 Ollama Server<br/>Port: 11434<br/>Config: ollama-example.yaml<br/>Models: llama3.2:1b, llama3.2:3b<br/>Cache: .ollama]
-    end
-    
-    subgraph "🔧 MCP Web Processing"
-        MCP_SERVER[🔧 MCP Server<br/>Command: npx just-every mcp-read-website-fast<br/>Package: package.json<br/>Setup: make setup-mcp<br/>Node.js: 16.0.0+]
-        BEAUTIFUL_SOUP[🍲 BeautifulSoup Fallback<br/>Parser: html parser<br/>Clean: markdownify]
-        WEB_EXTRACT[📝 Content Extraction<br/>Readability: Mozilla<br/>Metadata: Title, URL]
-        URL_VALIDATE[✅ URL Validation<br/>Schemes: http https<br/>Format: urlparse]
-    end
-    
-    subgraph "💾 Data Storage"
-        SESSION_STATE[💾 Session State<br/>Location: Browser<br/>Persistence: Session<br/>Format: JSON<br/>Cleanup: Auto]
-        VECTOR_STORE[🗄️ Vector Storage<br/>Format: JSON arrays<br/>Dimensions: 384<br/>Model: all-MiniLM-L6-v2<br/>Location: Session]
-    end
-    
-    subgraph "📁 Configuration Files"
-        ST_CONFIG[📄 .streamlit/config.toml<br/>Port: 8501<br/>Max Upload: 50MB<br/>Theme: Custom<br/>CORS: Enabled]
-        LS_CONFIG[📄 llamastack/config/llamastack-config.yaml<br/>Port: 8321<br/>Provider: ollama<br/>APIs: inference, embeddings<br/>Health: /v1/health]
-        OLLAMA_CONFIG[📄 ollama-example.yaml<br/>Port: 11434<br/>Models: llama3.2:1b<br/>Provider: local<br/>Cache: .ollama]
-        PKG_CONFIG[📄 package.json<br/>MCP: just-every mcp-read-website-fast<br/>Version: 0.1.13<br/>Node: 16.0.0+]
-    end
-    
-    %% Connections
-    BROWSER -->|HTTP/WebSocket| STREAMLIT
-    STREAMLIT -->|HTTP API| LLAMASTACK
-    STREAMLIT -->|HTTP API| OLLAMA_SERVER
-    STREAMLIT -->|Subprocess| MCP_SERVER
-    STREAMLIT -->|Session| SESSION_STATE
-    STREAMLIT -->|Session| VECTOR_STORE
-    
-    %% Configuration
-    STREAMLIT -->|Read| ST_CONFIG
-    LLAMASTACK -->|Read| LS_CONFIG
-    OLLAMA_SERVER -->|Read| OLLAMA_CONFIG
-    MCP_SERVER -->|Read| PKG_CONFIG
-    
-    %% Fallback connections
-    LLAMASTACK -.->|Fallback| OLLAMA_SERVER
-    
-    style BROWSER fill:#e3f2fd
-    style STREAMLIT fill:#fff3e0
-    style LLAMASTACK fill:#e8f5e8
-    style OLLAMA_SERVER fill:#f3e5f5
-    style MCP_SERVER fill:#fff8e1
-    style SESSION_STATE fill:#fce4ec
-    style VECTOR_STORE fill:#f1f8e9
-```
-
-### **System Health & Diagnostics**
-
-```mermaid
-flowchart TD
-    MONITOR([🔌 System Monitor]) --> CHECK_LS[🦙 Check LlamaStack<br/>Health endpoint]
-    MONITOR --> CHECK_OL[🏠 Check Ollama<br/>Model list]
-    
-    CHECK_LS -->|✅ Online| LS_DIAG[🩺 LlamaStack Diagnostics<br/>Endpoint discovery]
-    CHECK_LS -->|❌ Offline| LS_ERROR[❌ Connection Issues<br/>Show recommendations]
-    
-    CHECK_OL -->|✅ Running| OL_MODELS[📦 List Models<br/>Available models]
-    CHECK_OL -->|❌ Offline| OL_ERROR[❌ Ollama Down<br/>Installation guide]
-    
-    LS_DIAG --> TEST_ENDPOINTS[📡 Test Endpoints<br/>Models, chat, embeddings]
-    TEST_ENDPOINTS --> RECOMMEND[💡 Recommendations<br/>Fix suggestions]
-    
-    OL_MODELS --> MODEL_STATUS[📊 Model Status<br/>Local vs remote]
-    
-    RECOMMEND --> STATUS_UI[📱 Status Display<br/>Real-time indicators]
-    MODEL_STATUS --> STATUS_UI
-    LS_ERROR --> STATUS_UI
-    OL_ERROR --> STATUS_UI
-    
-    style MONITOR fill:#e3f2fd
-    style STATUS_UI fill:#e8f5e8
-    style LS_ERROR fill:#ffebee
-    style OL_ERROR fill:#ffebee
 ```
 
 ---
