@@ -324,6 +324,39 @@ class WebContentProcessor:
 
             # Try direct request with original URL
             response = requests.get(url, timeout=self.timeout)
+            
+            # Handle specific HTTP status codes
+            if response.status_code == 404:
+                return {
+                    'content': f"Page not found: {url}",
+                    'title': f"Error - Page Not Found",
+                    'metadata': {'url': url, 'status_code': 404},
+                    'method': 'requests_error',
+                    'success': False,
+                    'error': 'HTTP 404 - Page not found',
+                    'server_used': 'Direct HTTP request'
+                }
+            elif response.status_code == 403:
+                return {
+                    'content': f"Access forbidden: {url}",
+                    'title': f"Error - Access Forbidden",
+                    'metadata': {'url': url, 'status_code': 403},
+                    'method': 'requests_error',
+                    'success': False,
+                    'error': 'HTTP 403 - Access forbidden',
+                    'server_used': 'Direct HTTP request'
+                }
+            elif response.status_code >= 500:
+                return {
+                    'content': f"Server error: {url}",
+                    'title': f"Error - Server Error",
+                    'metadata': {'url': url, 'status_code': response.status_code},
+                    'method': 'requests_error',
+                    'success': False,
+                    'error': f'HTTP {response.status_code} - Server error',
+                    'server_used': 'Direct HTTP request'
+                }
+            
             response.raise_for_status()
 
             content_type = response.headers.get('content-type', '').lower()
@@ -364,7 +397,31 @@ class WebContentProcessor:
                     'server_used': 'BeautifulSoup (HTML parsing)'
                 }
             else:
-                return None
+                # Try to extract text content even for unsupported content types
+                try:
+                    content = response.text
+                    if len(content) > 100:  # Only return if we got meaningful content
+                        return {
+                            'content': content,
+                            'title': f"Content from {url}",
+                            'metadata': {'url': url, 'content_type': content_type},
+                            'method': 'requests_plain_text',
+                            'success': True,
+                            'server_used': f'Direct HTTP request ({content_type})'
+                        }
+                except Exception as e:
+                    print(f"🔄 Failed to extract text from {content_type}: {str(e)}")
+                
+                # If we get here, we couldn't extract meaningful content
+                return {
+                    'content': f"Unable to extract content from {url}. Content type: {content_type}",
+                    'title': f"Content from {url}",
+                    'metadata': {'url': url, 'content_type': content_type, 'error': 'Unsupported content type'},
+                    'method': 'requests_fallback',
+                    'success': False,
+                    'error': f'Unsupported content type: {content_type}',
+                    'server_used': 'Direct HTTP request (fallback)'
+                }
 
         except Exception as e:
             print(f"🔄 Fallback extraction failed: {str(e)}")
@@ -396,6 +453,8 @@ class WebContentProcessor:
                 st.info(f"🔗 Processing: {domain_info.get('domain', url)}")
             
             # Try MCP server first
+            if silent_mode:
+                print(f"🔄 Trying MCP server for {url}")
             result = self.extract_with_mcp_server(url)
             if result and result.get('success'):
                 # Add processing metadata
@@ -431,7 +490,7 @@ class WebContentProcessor:
             
             # If MCP server failed, try fallback methods (only log in silent mode)
             if silent_mode:
-                print(f"📦 MCP server failed for {url}, using fallback...")
+                print(f"📦 MCP server failed for {url}, trying fallback methods...")
             
             result = self.extract_with_fallback(url)
             if result and result.get('success'):
@@ -464,19 +523,20 @@ class WebContentProcessor:
                 return result
             
             # If all methods failed
+            if silent_mode:
+                print(f"❌ All extraction methods failed for {url}")
+            
             if not silent_mode:
                 st.error(f"❌ Failed to extract content from {domain_info.get('domain', url)}")
                 st.info("💡 **Troubleshooting:**\n- Check if the URL is accessible\n- Try a different URL\n- The page might require JavaScript or authentication")
-            else:
-                print(f"❌ Failed to extract content from {url}")
             
             return None
             
         except Exception as e:
-            if not silent_mode:
-                st.error(f"❌ Error processing URL: {str(e)}")
+            if silent_mode:
+                print(f"❌ Exception during processing {url}: {str(e)}")
             else:
-                print(f"❌ Error processing URL {url}: {str(e)}")
+                st.error(f"❌ Error processing {url}: {str(e)}")
             return None
 
 

@@ -4,18 +4,33 @@ Handles file uploads, processing, and document library management
 """
 
 import streamlit as st
+import os
 import time
+import tempfile
+import signal
+import gc
+from typing import List, Any, Optional
+from pathlib import Path
 import pandas as pd
-from typing import List, Dict, Any
 from .utils import format_file_size, mark_upload_start, mark_upload_success, mark_upload_failed
 from .web_content_processor import WebContentProcessor
+
+# Set environment variable to avoid tokenizers parallelism warning
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+# Import other modules
+try:
+    import docling
+    DOCLING_AVAILABLE = True
+except ImportError:
+    DOCLING_AVAILABLE = False
 
 
 # Global embedding model cache
 _embedding_model = None
 
 def read_file_content(uploaded_file) -> str:
-    """Extract text content from uploaded files with performance optimization"""
+    """Extract text content from uploaded files with performance optimization and robust error handling"""
     try:
         # Read file content efficiently
         file_content = uploaded_file.read()
@@ -27,83 +42,332 @@ def read_file_content(uploaded_file) -> str:
         if file_size_mb > 5:  # Large files need optimization
             print(f"🚀 Optimizing extraction for large file ({file_size_mb:.1f}MB)")
         
-        # Try to use docling for document extraction with optimization
-        try:
-            from docling.document_converter import DocumentConverter
-            
-            # Create converter with optimized settings for large files
-            converter = DocumentConverter()
-            
-            # Convert based on file type
-            if uploaded_file.type == "application/pdf":
-                # For PDF files, use docling with optimization
-                import tempfile
-                import os
-                
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                    tmp_file.write(file_content)
-                    tmp_file.flush()
-                    
-                    # Convert with docling - optimized for large files
-                    if file_size_mb > 10:
-                        # For very large files, limit pages or use faster extraction
-                        print("📚 Using optimized extraction for large PDF...")
-                    
-                    result = converter.convert(tmp_file.name)
-                    content = result.document.export_to_markdown()
-                    
-                    # Clean up temp file
-                    os.unlink(tmp_file.name)
-                    
-                    if content.strip():
-                        print(f"✅ Extracted {len(content)} chars from {uploaded_file.name} using docling")
-                        
-                        # For very large content, do preliminary optimization
-                        if len(content) > 500000:  # 500KB of text
-                            content = optimize_extracted_content(content)
-                            print(f"🚀 Optimized content to {len(content)} chars")
-                            
-                        return content
-                        
-        except ImportError:
-            print("⚠️ Docling not available, falling back to basic text extraction")
-        except Exception as e:
-            print(f"⚠️ Docling extraction failed for {uploaded_file.name}: {e}")
+        # Try docling for all supported file types with robust error handling
+        content = try_docling_extraction_enhanced(uploaded_file, file_content, file_size_mb)
+        if content:
+            return content
         
-        # Fallback to basic text extraction
-        try:
-            if uploaded_file.type == "text/plain":
-                content = file_content.decode('utf-8')
-            elif uploaded_file.type == "application/pdf":
-                # Simple PDF text extraction fallback
-                content = extract_pdf_text_simple(file_content)
-            elif uploaded_file.name.endswith('.md'):
-                content = file_content.decode('utf-8')
-            else:
-                # Try to decode as text
-                try:
-                    content = file_content.decode('utf-8')
-                except:
-                    content = file_content.decode('utf-8', errors='ignore')
-            
-            if content.strip():
-                print(f"✅ Extracted {len(content)} chars using fallback method")
-                
-                # Optimize if content is very large
-                if len(content) > 500000:
-                    content = optimize_extracted_content(content)
-                    print(f"🚀 Optimized content to {len(content)} chars")
-                
-                return content
-                
-        except Exception as e:
-            print(f"❌ Basic extraction failed: {e}")
+        # Fallback to specialized extraction for each file type
+        content = try_specialized_extraction(uploaded_file, file_content, file_size_mb)
+        if content:
+            return content
+        
+        # Final fallback to basic text extraction
+        content = try_basic_extraction(uploaded_file, file_content)
+        if content:
+            return content
         
         return ""
         
     except Exception as e:
         print(f"❌ Failed to read {uploaded_file.name}: {e}")
         return ""
+
+def try_docling_extraction_enhanced(uploaded_file, file_content: bytes, file_size_mb: float) -> str:
+    """Try docling extraction for all supported file types with robust error handling"""
+    try:
+        from docling.document_converter import DocumentConverter
+        
+        # Create converter with optimized settings for large files
+        converter = DocumentConverter()
+        
+        # Determine file extension and MIME type
+        file_extension = get_file_extension(uploaded_file.name)
+        mime_type = uploaded_file.type
+        
+        # Map file types to appropriate suffixes
+        suffix_map = {
+            'pdf': '.pdf',
+            'docx': '.docx', 
+            'pptx': '.pptx',
+            'txt': '.txt',
+            'md': '.md'
+        }
+        
+        suffix = suffix_map.get(file_extension.lower(), '.txt')
+        
+        # Use a more secure temporary file creation
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode='wb') as tmp_file:
+            try:
+                tmp_file.write(file_content)
+                tmp_file.flush()
+                tmp_file_path = tmp_file.name
+            except Exception as write_error:
+                print(f"⚠️ Failed to write temporary file: {write_error}")
+                return None
+        
+        try:
+            # Add timeout and memory protection
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError(f"{file_extension.upper()} processing timed out")
+            
+            # Set a timeout based on file size (larger files get more time)
+            timeout_seconds = min(60, max(15, int(file_size_mb * 10)))  # 15-60 seconds
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
+            
+            try:
+                print(f"🔧 Converting {file_extension.upper()} with docling (timeout: {timeout_seconds}s)...")
+                result = converter.convert(tmp_file_path)
+                content = result.document.export_to_markdown()
+                signal.alarm(0)  # Cancel the alarm
+                
+                # Clean up temp file
+                try:
+                    os.unlink(tmp_file_path)
+                except:
+                    pass
+                
+                if content and content.strip():
+                    print(f"✅ Extracted {len(content)} chars from {uploaded_file.name} using docling")
+                    
+                    # For very large content, do preliminary optimization
+                    if len(content) > 500000:  # 500KB of text
+                        content = optimize_extracted_content(content)
+                        print(f"🚀 Optimized content to {len(content)} chars")
+                        
+                    return content
+                else:
+                    print("⚠️ Docling returned empty content")
+                    return None
+                    
+            except TimeoutError:
+                print(f"⚠️ {file_extension.upper()} processing timed out, falling back to other methods")
+                signal.alarm(0)  # Cancel the alarm
+                return None
+            except Exception as conversion_error:
+                print(f"⚠️ Docling conversion failed for {file_extension.upper()}: {conversion_error}")
+                signal.alarm(0)  # Cancel the alarm
+                return None
+                
+        except Exception as e:
+            print(f"⚠️ Docling processing error for {file_extension.upper()}: {e}")
+            return None
+        finally:
+            # Ensure temp file is cleaned up
+            try:
+                if os.path.exists(tmp_file_path):
+                    os.unlink(tmp_file_path)
+            except:
+                pass
+                
+    except ImportError:
+        print("⚠️ Docling not available, falling back to specialized extraction")
+        return None
+    except Exception as e:
+        print(f"⚠️ Docling extraction failed for {uploaded_file.name}: {e}")
+        return None
+
+def try_specialized_extraction(uploaded_file, file_content: bytes, file_size_mb: float) -> str:
+    """Try specialized extraction methods for each file type"""
+    file_extension = get_file_extension(uploaded_file.name)
+    
+    try:
+        if file_extension.lower() == 'pdf':
+            return try_multiple_pdf_extractors(file_content, uploaded_file.name)
+        elif file_extension.lower() == 'docx':
+            return try_docx_extraction(file_content, uploaded_file.name)
+        elif file_extension.lower() == 'pptx':
+            return try_pptx_extraction(file_content, uploaded_file.name)
+        elif file_extension.lower() in ['txt', 'md']:
+            return try_text_extraction(file_content, uploaded_file.name)
+        else:
+            print(f"⚠️ No specialized extractor for {file_extension}")
+            return None
+            
+    except Exception as e:
+        print(f"⚠️ Specialized extraction failed for {file_extension}: {e}")
+        return None
+
+def try_docx_extraction(file_content: bytes, filename: str) -> str:
+    """Try DOCX extraction with multiple methods"""
+    print(f"🔧 Trying DOCX extraction for {filename}")
+    
+    # Method 1: python-docx
+    try:
+        from docx import Document
+        import io
+        
+        doc = Document(io.BytesIO(file_content))
+        content = ""
+        
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                content += paragraph.text + "\n"
+        
+        if content.strip():
+            print(f"✅ python-docx extracted {len(content)} chars from {filename}")
+            return content
+        else:
+            print("⚠️ python-docx returned empty content")
+            
+    except ImportError:
+        print("⚠️ python-docx not available")
+    except Exception as e:
+        print(f"⚠️ python-docx extraction failed: {e}")
+    
+    # Method 2: Try with docling fallback (already handled above)
+    print("⚠️ DOCX extraction failed, using fallback")
+    return None
+
+def try_pptx_extraction(file_content: bytes, filename: str) -> str:
+    """Try PPTX extraction with multiple methods"""
+    print(f"🔧 Trying PPTX extraction for {filename}")
+    
+    # Method 1: python-pptx
+    try:
+        from pptx import Presentation
+        import io
+        
+        prs = Presentation(io.BytesIO(file_content))
+        content = ""
+        
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    content += shape.text + "\n"
+        
+        if content.strip():
+            print(f"✅ python-pptx extracted {len(content)} chars from {filename}")
+            return content
+        else:
+            print("⚠️ python-pptx returned empty content")
+            
+    except ImportError:
+        print("⚠️ python-pptx not available")
+    except Exception as e:
+        print(f"⚠️ python-pptx extraction failed: {e}")
+    
+    # Method 2: Try with docling fallback (already handled above)
+    print("⚠️ PPTX extraction failed, using fallback")
+    return None
+
+def try_text_extraction(file_content: bytes, filename: str) -> str:
+    """Try text extraction for TXT and MD files"""
+    print(f"🔧 Trying text extraction for {filename}")
+    
+    try:
+        # Try UTF-8 first
+        content = file_content.decode('utf-8')
+        if content.strip():
+            print(f"✅ Text extraction successful: {len(content)} chars from {filename}")
+            return content
+    except UnicodeDecodeError:
+        try:
+            # Try with error handling
+            content = file_content.decode('utf-8', errors='ignore')
+            if content.strip():
+                print(f"✅ Text extraction with error handling: {len(content)} chars from {filename}")
+                return content
+        except Exception as e:
+            print(f"⚠️ Text extraction failed: {e}")
+    
+    print("⚠️ Text extraction failed")
+    return None
+
+def get_file_extension(filename: str) -> str:
+    """Get file extension from filename"""
+    return filename.split('.')[-1] if '.' in filename else ''
+
+def try_basic_extraction(uploaded_file, file_content: bytes) -> str:
+    """Try basic text extraction with multiple fallbacks"""
+    try:
+        if uploaded_file.type == "text/plain":
+            content = file_content.decode('utf-8')
+        elif uploaded_file.type == "application/pdf":
+            # Try multiple PDF extraction methods
+            content = try_multiple_pdf_extractors(file_content, uploaded_file.name)
+        elif uploaded_file.name.endswith('.md'):
+            content = file_content.decode('utf-8')
+        else:
+            # Try to decode as text
+            try:
+                content = file_content.decode('utf-8')
+            except:
+                content = file_content.decode('utf-8', errors='ignore')
+        
+        if content and content.strip():
+            print(f"✅ Extracted {len(content)} chars using basic fallback method")
+            
+            # Optimize if content is very large
+            if len(content) > 500000:
+                content = optimize_extracted_content(content)
+                print(f"🚀 Optimized content to {len(content)} chars")
+            
+            return content
+        else:
+            print("⚠️ Basic extraction returned empty content")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Basic extraction failed: {e}")
+        return None
+
+def try_multiple_pdf_extractors(file_content: bytes, filename: str) -> str:
+    """Try multiple PDF extraction methods with fallbacks"""
+    
+    # Method 1: Try PyPDF2
+    try:
+        import PyPDF2
+        import io
+        
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        content = ""
+        
+        for page_num, page in enumerate(pdf_reader.pages):
+            try:
+                page_text = page.extract_text()
+                if page_text:
+                    content += page_text + "\n"
+            except Exception as page_error:
+                print(f"⚠️ Failed to extract page {page_num}: {page_error}")
+                continue
+        
+        if content.strip():
+            print(f"✅ PyPDF2 extracted {len(content)} chars from {filename}")
+            return content
+        else:
+            print("⚠️ PyPDF2 returned empty content")
+            
+    except ImportError:
+        print("⚠️ PyPDF2 not available")
+    except Exception as e:
+        print(f"⚠️ PyPDF2 extraction failed: {e}")
+    
+    # Method 2: Try pdfplumber
+    try:
+        import pdfplumber
+        
+        with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+            content = ""
+            for page in pdf.pages:
+                try:
+                    page_text = page.extract_text()
+                    if page_text:
+                        content += page_text + "\n"
+                except Exception as page_error:
+                    print(f"⚠️ Failed to extract page with pdfplumber: {page_error}")
+                    continue
+            
+            if content.strip():
+                print(f"✅ pdfplumber extracted {len(content)} chars from {filename}")
+                return content
+            else:
+                print("⚠️ pdfplumber returned empty content")
+                
+    except ImportError:
+        print("⚠️ pdfplumber not available")
+    except Exception as e:
+        print(f"⚠️ pdfplumber extraction failed: {e}")
+    
+    # Method 3: Simple fallback
+    print("⚠️ All PDF extractors failed, using simple fallback")
+    return f"[PDF content from {filename} - {len(file_content)} bytes] - PDF extraction failed. Please ensure the PDF is not corrupted or password-protected."
 
 
 def optimize_extracted_content(content: str) -> str:
@@ -555,20 +819,33 @@ def process_web_url(url: str):
         st.error(f"❌ Error processing URL: {str(e)}")
 
 
+def get_memory_usage():
+    """Get current memory usage in MB"""
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / 1024 / 1024  # Convert to MB
+    except ImportError:
+        return 0
+
 def process_bulk_web_urls(urls: List[str], progress_callback=None):
-    """Process multiple web URLs in bulk and add to document storage"""
+    """Process multiple web URLs in bulk and add to document storage with improved memory management"""
     if not urls:
         st.error("Please provide at least one URL")
         return
     
+    # Import urlparse at the top of the function
+    from urllib.parse import urlparse
+    
     # Limit the number of URLs to prevent overwhelming the system
-    MAX_URLS = 50
+    MAX_URLS = 25  # Reduced to prevent memory issues
     if len(urls) > MAX_URLS:
         st.warning(f"⚠️ Too many URLs ({len(urls)}). Processing first {MAX_URLS} URLs only.")
         urls = urls[:MAX_URLS]
     
     # Clean and validate URLs
     valid_urls = []
+    invalid_urls = []
     for url in urls:
         url = url.strip()
         if url and url.startswith(('http://', 'https://')):
@@ -578,6 +855,21 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
             if not url.startswith(('http://', 'https://')):
                 url = f"https://{url}"
                 valid_urls.append(url)
+        else:
+            invalid_urls.append(url)
+    
+    # Show URL validation results
+    st.info(f"📊 URL Validation Results:")
+    st.markdown(f"""
+    - 📄 **Total URLs in file**: {len(urls)}
+    - ✅ **Valid URLs**: {len(valid_urls)}
+    - ❌ **Invalid URLs**: {len(invalid_urls)}
+    """)
+    
+    if invalid_urls:
+        with st.expander("❌ Invalid URLs (will be skipped)"):
+            for invalid_url in invalid_urls:
+                st.code(invalid_url)
     
     if not valid_urls:
         st.error("No valid URLs found. Please provide URLs starting with http:// or https://")
@@ -585,6 +877,11 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
     
     # Show processing start message
     st.info(f"🚀 Starting bulk processing of {len(valid_urls)} URLs...")
+    
+    # Monitor initial memory usage
+    initial_memory = get_memory_usage()
+    if initial_memory > 0:
+        st.info(f"💾 Initial memory usage: {initial_memory:.1f} MB")
     
     # Initialize web content processor if not exists
     if 'web_content_processor' not in st.session_state:
@@ -649,128 +946,213 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
                         'character_count': len(content),
                         'upload_time': time.strftime("%Y-%m-%d %H:%M:%S"),
                         'source_url': url,
-                        'domain': domain,
-                        'extraction_method': result.get('method', 'unknown'),
-                        'metadata': result.get('metadata', {}),
-                        'processed_at': result.get('processed_at', time.time())
+                        'domain': domain
                     }
                     
-                    # Create chunks using existing chunking logic
-                    chunks = create_chunks_from_content(content)
-                    web_document['chunk_count'] = len(chunks)
-                    
-                    # Create embeddings using existing embedding system
-                    embeddings_data = create_embeddings_from_chunks(chunks)
-                    
-                    if embeddings_data:
-                        web_document['chunks'] = chunks
-                        web_document['embeddings'] = embeddings_data
+                    # Create chunks and embeddings for web content
+                    try:
+                        # Update status to show chunking
+                        status_text.text(f"Processing {i + 1}/{len(valid_urls)}: {url} - Creating chunks...")
                         
-                        # Add to uploaded documents
+                        # Create chunks using existing chunking logic
+                        chunks = create_chunks_from_content(content)
+                        web_document['chunk_count'] = len(chunks)
+                        
+                        # Update status to show embedding creation
+                        status_text.text(f"Processing {i + 1}/{len(valid_urls)}: {url} - Creating embeddings...")
+                        
+                        # Create embeddings using existing embedding system
+                        embeddings_data = create_embeddings_from_chunks(chunks)
+                        
+                        if embeddings_data:
+                            web_document['chunks'] = chunks
+                            web_document['embeddings'] = embeddings_data
+                            
+                            # Store embeddings in VectorIO database
+                            vectorio_success = False
+                            try:
+                                if 'llamastack_client' in st.session_state:
+                                    # Prepare metadata for VectorIO
+                                    vector_metadata = []
+                                    for j, chunk in enumerate(chunks):
+                                        vector_metadata.append({
+                                            "document_id": f"web_{domain}_{j}",
+                                            "document_name": f"Web Content from {url}",
+                                            "chunk_index": j,
+                                            "chunk_content": chunk,
+                                            "file_type": "WEB",
+                                            "source_url": url,
+                                            "domain": domain,
+                                            "title": title,
+                                            "upload_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                            "chunk_count": len(chunks),
+                                            "character_count": len(content)
+                                        })
+                                    
+                                    vectorio_success = st.session_state.llamastack_client.store_embeddings_in_vector_db(
+                                        embeddings=embeddings_data,
+                                        metadata=vector_metadata,
+                                        vector_db_id="faiss"
+                                    )
+                                    if vectorio_success:
+                                        print(f"✅ Successfully stored web content embeddings in VectorIO for {url}")
+                                    else:
+                                        print(f"⚠️ Failed to store web content in VectorIO for {url}")
+                            except Exception as e:
+                                print(f"⚠️ VectorIO storage failed for web content {url}: {e}")
+                            
+                            web_document['vectorio_stored'] = vectorio_success
+                            
+                            # Add to session state
+                            st.session_state.uploaded_documents.append(web_document)
+                            results['successful'].append({
+                                'url': url,
+                                'domain': domain,
+                                'title': title,
+                                'content_length': len(content),
+                                'chunks': len(chunks),
+                                'vectorio_stored': vectorio_success
+                            })
+                            
+                            # Force garbage collection after each successful processing
+                            gc.collect()
+                            # Clear any large objects from memory
+                            if 'web_document' in locals():
+                                del web_document
+                            if 'content' in locals():
+                                del content
+                            if 'chunks' in locals():
+                                del chunks
+                            if 'embeddings_data' in locals():
+                                del embeddings_data
+                            gc.collect()
+                        else:
+                            # If embedding creation failed, still store the document but mark it
+                            web_document['embedding_error'] = 'Failed to create embeddings'
+                            st.session_state.uploaded_documents.append(web_document)
+                            results['successful'].append({
+                                'url': url,
+                                'domain': domain,
+                                'title': title,
+                                'content_length': len(content),
+                                'chunks': len(chunks),
+                                'note': 'Content stored but embeddings failed'
+                            })
+                    except Exception as embedding_error:
+                        # If chunking/embedding fails, still store the document
+                        web_document['embedding_error'] = str(embedding_error)
                         st.session_state.uploaded_documents.append(web_document)
-                        
                         results['successful'].append({
                             'url': url,
                             'domain': domain,
                             'title': title,
-                            'chunks': len(chunks),
-                            'size_mb': web_document['file_size_mb'],
-                            'extraction_method': result.get('method', 'unknown')
+                            'content_length': len(content),
+                            'chunks': 0,
+                            'note': f'Content stored but processing failed: {str(embedding_error)}'
                         })
-                    else:
-                        results['failed'].append({
-                            'url': url,
-                            'domain': domain,
-                            'reason': 'Failed to create embeddings'
-                        })
+                    
                 else:
+                    # Handle failed processing - result is None or success is False
+                    if result is None:
+                        error_msg = "No response from processor - all extraction methods failed"
+                    else:
+                        error_msg = result.get('error', 'Unknown error during processing')
+                    
                     results['failed'].append({
                         'url': url,
-                        'domain': urlparse(url).netloc if 'urlparse' in locals() else 'unknown',
-                        'reason': 'Failed to extract content'
+                        'domain': urlparse(url).netloc if url else 'unknown',
+                        'error': error_msg
                     })
-                
-                results['total_processed'] += 1
-                
+                    
             except Exception as e:
+                # Handle individual URL processing errors
+                error_msg = str(e)
                 results['failed'].append({
                     'url': url,
-                    'domain': 'unknown',
-                    'reason': f'Error: {str(e)}'
+                    'domain': urlparse(url).netloc if url else 'unknown',
+                    'error': error_msg
                 })
-                results['total_processed'] += 1
+                
+                # Continue with next URL instead of stopping
+                continue
+            
+            # Add a small delay between requests to prevent overwhelming servers
+            time.sleep(0.5)
+            
+            # Force garbage collection periodically
+            if (i + 1) % 5 == 0:
+                gc.collect()
+                # Monitor memory usage every 5 URLs
+                current_memory = get_memory_usage()
+                if current_memory > 0:
+                    memory_increase = current_memory - initial_memory
+                    if memory_increase > 500:  # If memory increased by more than 500MB
+                        st.warning(f"⚠️ High memory usage detected: {current_memory:.1f} MB (+{memory_increase:.1f} MB)")
+                        # Force more aggressive cleanup
+                        gc.collect()
+                        gc.collect()
+                        # Add a small delay to allow memory cleanup
+                        time.sleep(1)
         
-        # Clear progress indicators
-        progress_bar.empty()
-        status_text.empty()
+        # Update final progress
+        progress_bar.progress(1.0)
+        status_text.text("✅ Bulk processing completed!")
         
-        # Display concise results summary
-        st.markdown("### 📊 Processing Complete")
+        # Show results summary
+        st.success(f"✅ Bulk processing completed!")
         
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("✅ Successful", len(results['successful']))
-        with col2:
-            st.metric("❌ Failed", len(results['failed']))
-        with col3:
-            st.metric("🔄 Duplicates", len(results['duplicates']))
-        with col4:
-            st.metric("📊 Total", results['total_processed'])
+        # Report final memory usage
+        final_memory = get_memory_usage()
+        if final_memory > 0 and initial_memory > 0:
+            memory_change = final_memory - initial_memory
+            st.info(f"💾 Final memory usage: {final_memory:.1f} MB (change: {memory_change:+.1f} MB)")
         
-        # Show summary message
+        # Calculate total chunks and content
+        total_chunks = sum(item.get('chunks', 0) for item in results['successful'])
+        total_content_length = sum(item.get('content_length', 0) for item in results['successful'])
+        
+        st.markdown(f"""
+        **Processing Results:**
+        - ✅ **Successful**: {len(results['successful'])} URLs
+        - ❌ **Failed**: {len(results['failed'])} URLs
+        - 🔄 **Duplicates**: {len(results['duplicates'])} URLs
+        - 📊 **Total Processed**: {len(valid_urls)} URLs
+        - 📄 **Total Chunks Created**: {total_chunks} chunks
+        - 📝 **Total Content**: {total_content_length:,} characters
+        """)
+        
+        # Show successful URLs with their processing details
         if results['successful']:
-            total_chunks = sum(item['chunks'] for item in results['successful'])
-            total_size = sum(item['size_mb'] for item in results['successful'])
-            
-            # Determine primary extraction method
-            methods = [item.get('extraction_method', 'unknown') for item in results['successful']]
-            primary_method = max(set(methods), key=methods.count) if methods else 'unknown'
-            
-            method_display = {
-                'mcp_just-every': '📦 Just-Every MCP',
-                'requests_github_raw': '🔄 GitHub Raw Content',
-                'requests_beautifulsoup': '🔄 BeautifulSoup',
-                'requests_plain_text': '🔄 Direct HTTP'
-            }.get(primary_method, primary_method)
-            
-            st.success(f"🎉 Successfully processed {len(results['successful'])} URLs ({total_chunks} chunks, {total_size:.2f} MB)")
-            st.info(f"🔧 Primary method: {method_display}")
-        
-        # Show failures only if there are any
-        if results['failed']:
-            with st.expander(f"❌ {len(results['failed'])} URLs failed", expanded=False):
-                for item in results['failed'][:5]:  # Show first 5 failures
-                    st.error(f"**{item['domain']}** - {item['reason']}")
-                if len(results['failed']) > 5:
-                    st.caption(f"... and {len(results['failed']) - 5} more failures")
-        
-        # Show successful URLs with their extraction methods
-        if results['successful']:
-            with st.expander(f"✅ {len(results['successful'])} URLs processed successfully", expanded=False):
+            with st.expander(f"✅ {len(results['successful'])} URLs processed successfully"):
                 for item in results['successful']:
-                    method = item.get('extraction_method', 'unknown')
-                    method_display = {
-                        'mcp_just-every': '📦 Just-Every MCP',
-                        'requests_github_raw': '🔄 GitHub Raw Content',
-                        'requests_beautifulsoup': '🔄 BeautifulSoup',
-                        'requests_plain_text': '🔄 Direct HTTP'
-                    }.get(method, method)
-                    
-                    st.success(f"**{item['domain']}** - {item['title']} ({item['chunks']} chunks)")
-                    st.caption(f"🔧 Method: {method_display}")
+                    st.markdown(f"**{item['domain']}** - {item['title']}")
+                    st.caption(f"📄 {item['chunks']} chunks | 📝 {item['content_length']:,} characters")
+                    if 'note' in item:
+                        st.caption(f"⚠️ {item['note']}")
+                    st.markdown("---")
         
-        # Show duplicates only if there are any
+        # Show failed URLs if any
+        if results['failed']:
+            with st.expander("❌ Failed URLs"):
+                for failed in results['failed']:
+                    st.markdown(f"**{failed['url']}** - {failed['error']}")
+        
+        # Show duplicate URLs if any
         if results['duplicates']:
-            with st.expander(f"🔄 {len(results['duplicates'])} URLs skipped (duplicates)", expanded=False):
-                for item in results['duplicates'][:5]:  # Show first 5 duplicates
-                    st.warning(f"**{item['domain']}** - {item['reason']}")
-                if len(results['duplicates']) > 5:
-                    st.caption(f"... and {len(results['duplicates']) - 5} more duplicates")
+            with st.expander("�� Duplicate URLs"):
+                for duplicate in results['duplicates']:
+                    st.markdown(f"**{duplicate['url']}** - {duplicate['reason']}")
+        
+        # Final garbage collection
+        gc.collect()
         
     except Exception as e:
-        st.error(f"❌ Bulk processing failed: {str(e)}")
-        progress_bar.empty()
-        status_text.empty()
+        st.error(f"❌ Error during bulk processing: {str(e)}")
+        # Clean up on error
+        gc.collect()
+    finally:
+        # Always clean up resources
+        gc.collect()
 
 
 def render_url_paste_input():
@@ -821,6 +1203,23 @@ def render_url_paste_input():
         - ✅ `https://github.com/username/repo/blob/main/docs/guide.md`
         """)
 
+def is_valid_url_flexible(url: str) -> bool:
+    """Check if URL is valid, handling both with and without protocols"""
+    try:
+        # If URL doesn't start with protocol, add https:// for validation
+        if not url.startswith(('http://', 'https://')):
+            url = f"https://{url}"
+        
+        # Parse the URL
+        from urllib.parse import urlparse
+        result = urlparse(url)
+        
+        # Check if it has a valid domain (netloc) and contains a dot
+        return bool(result.netloc and '.' in result.netloc and len(result.netloc.split('.')[0]) > 0)
+    except Exception:
+        return False
+
+
 def render_url_file_upload_input():
     """Render the URL file upload interface"""
     st.markdown("Upload a text or CSV file containing a list of URLs to process.")
@@ -829,7 +1228,7 @@ def render_url_file_upload_input():
     uploaded_file = st.file_uploader(
         "Upload URL list file",
         type=['txt', 'csv'],
-        help="Upload a text file with one URL per line, or a CSV file with URLs in the first column"
+        help="Upload a text file with one URL per line (each line will be validated as a URL), or a CSV file with URLs in the first column"
     )
     
     # Process URLs from file if uploaded
@@ -846,7 +1245,34 @@ def render_url_file_upload_input():
             else:
                 # Handle text file
                 content = uploaded_file.read().decode('utf-8')
-                urls_from_file = [line.strip() for line in content.split('\n') if line.strip()]
+                # Process all non-empty lines and validate each as a URL
+                all_lines = [line.strip() for line in content.split('\n') if line.strip()]
+                
+                # Validate URLs and filter out invalid ones
+                valid_urls = []
+                invalid_lines = []
+                
+                for line in all_lines:
+                    # Validate URL using flexible validation
+                    if is_valid_url_flexible(line):
+                        # Add https:// if no protocol specified
+                        url = line
+                        if not url.startswith(('http://', 'https://')):
+                            url = f"https://{url}"
+                        valid_urls.append(url)
+                    else:
+                        invalid_lines.append(line)
+                
+                urls_from_file = valid_urls
+                
+                # Show processing summary
+                if invalid_lines:
+                    st.warning(f"⚠️ Found {len(invalid_lines)} invalid lines that will be skipped")
+                    with st.expander("Show invalid lines"):
+                        for line in invalid_lines:
+                            st.code(line)
+                if urls_from_file:
+                    st.success(f"📄 Found {len(urls_from_file)} valid URLs to process")
             
             if urls_from_file:
                 st.success(f"📄 Loaded {len(urls_from_file)} URLs from file")
@@ -872,6 +1298,9 @@ def render_url_file_upload_input():
         st.markdown("""
         **Supported File Formats:**
         - **Text files (.txt)**: One URL per line
+          - Each line is validated as a URL
+          - Invalid lines are automatically skipped
+          - URLs without protocol (http/https) will have https:// added automatically
         - **CSV files (.csv)**: URLs in the first column
         
         **Processing Limits:**
@@ -1075,12 +1504,43 @@ def process_uploaded_files(files: List[Any]) -> int:
                     embedding_quality = max(0, (len(chunks) - embedding_errors) / len(chunks) * 100)
                     st.metric("🎯 Quality", f"{embedding_quality:.0f}%")
                 
-                # Step 4: Store document
+                # Step 4: Store document and embeddings in VectorIO database
                 step_start = time.time()
-                progress_bar.progress(0.95)
-                status_text.text("💾 Storing document...")
+                progress_bar.progress(0.8)
+                status_text.text("💾 Storing in VectorIO database...")
                 
-                # Store document data with backup for session state persistence
+                # Prepare metadata for VectorIO
+                vector_metadata = []
+                for i, chunk in enumerate(chunks):
+                    vector_metadata.append({
+                        "document_id": f"file_{file.name}_{i}",
+                        "document_name": file.name,
+                        "chunk_index": i,
+                        "chunk_content": chunk,
+                        "file_type": "FILE",
+                        "file_size_mb": actual_size_mb,
+                        "upload_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "chunk_count": len(chunks),
+                        "character_count": len(content)
+                    })
+                
+                # Store embeddings in LlamaStack VectorIO database
+                vectorio_success = False
+                try:
+                    if 'llamastack_client' in st.session_state:
+                        vectorio_success = st.session_state.llamastack_client.store_embeddings_in_vector_db(
+                            embeddings=embeddings,
+                            metadata=vector_metadata,
+                            vector_db_id="faiss"  # Use the FAISS database configured in llamastack-config.yaml
+                        )
+                        if vectorio_success:
+                            print(f"✅ Successfully stored embeddings in VectorIO for {file.name}")
+                        else:
+                            print(f"⚠️ Failed to store in VectorIO, falling back to session state for {file.name}")
+                except Exception as e:
+                    print(f"⚠️ VectorIO storage failed for {file.name}: {e}")
+                
+                # Store document data with backup for session state persistence (fallback)
                 doc_data = {
                     'name': file.name,
                     'content': content,
@@ -1089,7 +1549,8 @@ def process_uploaded_files(files: List[Any]) -> int:
                     'processing_time': time.time() - start_time,
                     'chunk_count': len(chunks),
                     'embedding_errors': embedding_errors,
-                    'file_size_mb': actual_size_mb
+                    'file_size_mb': actual_size_mb,
+                    'vectorio_stored': vectorio_success
                 }
                 
                 # Check for duplicates before adding
@@ -1118,10 +1579,12 @@ def process_uploaded_files(files: List[Any]) -> int:
                 timing_text.text(f"⏱️ Total time: {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)")
                 
                 # Show performance summary
+                storage_method = "VectorIO + Session" if vectorio_success else "Session State (fallback)"
                 st.success(f"""
                 📄 **{file.name}** processed successfully!
                 - **Size:** {actual_size_mb:.1f}MB → {len(chunks)} chunks
                 - **Quality:** {embedding_quality:.0f}% embeddings successful
+                - **Storage:** {storage_method}
                 - **Speed:** {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)
                 """)
                 
@@ -1358,11 +1821,53 @@ def render_document_library() -> None:
                         
                         # Show content preview
                         content = doc.get('content', '')
+                        if not content and 'llamastack_client' in st.session_state:
+                            # Try to retrieve content from VectorIO if not in session state
+                            try:
+                                # Search for chunks from this document in VectorIO
+                                doc_name = doc.get('name', '')
+                                if doc_name:
+                                    # Use a broad search to get chunks from this document
+                                    vectorio_results = st.session_state.llamastack_client.search_similar_vectors(
+                                        query_text=doc_name,
+                                        vector_db_id="faiss",
+                                        top_k=50
+                                    )
+                                    
+                                    # Handle VectorIO response format (dict with 'chunks' key)
+                                    if isinstance(vectorio_results, dict) and 'chunks' in vectorio_results:
+                                        vectorio_results = vectorio_results['chunks']
+                                    
+                                    # Filter results to only include chunks from this document
+                                    doc_chunks = []
+                                    for result in vectorio_results:
+                                        metadata = result.get('metadata', {})
+                                        result_doc_name = metadata.get('document_name', '')
+                                        
+                                        # Try multiple matching strategies
+                                        if (result_doc_name == doc_name or 
+                                            result_doc_name.endswith(doc_name) or
+                                            doc_name in result_doc_name or
+                                            result_doc_name.replace('Web Content from ', '').replace('https://', '').replace('http://', '').replace('/', '') == doc_name.replace('🌐 ', '').replace('📄 ', '')):
+                                            chunk_content = result.get('content', '')
+                                            if chunk_content:
+                                                doc_chunks.append(chunk_content)
+                                    
+                                    # Combine chunks to reconstruct content
+                                    if doc_chunks:
+                                        content = ' '.join(doc_chunks)
+                                        # Update the document with retrieved content
+                                        doc['content'] = content
+                            except Exception as e:
+                                print(f"⚠️ Could not retrieve content from VectorIO for {doc.get('name', 'Unknown')}: {e}")
+                        
                         if content:
                             preview = content[:200].replace('\n', ' ').strip()
                             if len(content) > 200:
                                 preview += "..."
                             st.caption(f"**Preview:** {preview}")
+                        else:
+                            st.caption("**Preview:** Content not available in session state or VectorIO")
                     
                     # Action buttons
                     col1, col2, col3 = st.columns([1, 1, 1])
@@ -1405,24 +1910,105 @@ def render_document_library() -> None:
                         
                         # Show content in a scrollable area
                         content = doc.get('content', '')
-                        if len(content) > 5000:
-                            st.markdown("**Content Preview (first 5000 characters):**")
-                            st.text_area("Raw Content", content[:5000], height=300, key=f"content_preview_{i}")
-                            st.info(f"Content truncated. Full content has {len(content):,} characters.")
+                        
+                        # If content is not available, try to retrieve from VectorIO
+                        if not content and 'llamastack_client' in st.session_state:
+                            try:
+                                doc_name = doc.get('name', '')
+                                if doc_name:
+                                    # Get all chunks for this document from VectorIO
+                                    vectorio_results = st.session_state.llamastack_client.search_similar_vectors(
+                                        query_text=doc_name,
+                                        vector_db_id="faiss",
+                                        top_k=100
+                                    )
+                                    
+                                    # Handle VectorIO response format (dict with 'chunks' key)
+                                    if isinstance(vectorio_results, dict) and 'chunks' in vectorio_results:
+                                        vectorio_results = vectorio_results['chunks']
+                                    
+                                    # Filter and combine chunks
+                                    doc_chunks = []
+                                    for result in vectorio_results:
+                                        metadata = result.get('metadata', {})
+                                        result_doc_name = metadata.get('document_name', '')
+                                        
+                                        # Try multiple matching strategies
+                                        if (result_doc_name == doc_name or 
+                                            result_doc_name.endswith(doc_name) or
+                                            doc_name in result_doc_name or
+                                            result_doc_name.replace('Web Content from ', '').replace('https://', '').replace('http://', '').replace('/', '') == doc_name.replace('🌐 ', '').replace('📄 ', '')):
+                                            chunk_content = result.get('content', '')
+                                            if chunk_content:
+                                                doc_chunks.append(chunk_content)
+                                    
+                                    if doc_chunks:
+                                        content = ' '.join(doc_chunks)
+                                        doc['content'] = content
+                                        st.success(f"✅ Retrieved {len(doc_chunks)} chunks from VectorIO database")
+                            except Exception as e:
+                                st.error(f"❌ Could not retrieve content from VectorIO: {e}")
+                        
+                        if content:
+                            if len(content) > 5000:
+                                st.markdown("**Content Preview (first 5000 characters):**")
+                                st.text_area("Raw Content", content[:5000], height=300, key=f"content_preview_{i}")
+                                st.info(f"Content truncated. Full content has {len(content):,} characters.")
+                            else:
+                                st.text_area("Raw Content", content, height=300, key=f"content_full_{i}")
                         else:
-                            st.text_area("Raw Content", content, height=300, key=f"content_full_{i}")
+                            st.warning("⚠️ Content not available in session state or VectorIO database")
                     
                     # Show chunks if requested
                     if st.session_state.get(f"show_chunks_{i}", False):
                         st.markdown("---")
                         st.markdown("### 🧩 Document Chunks")
                         chunks = doc.get('chunks', [])
+                        
+                        # If chunks are not available, try to retrieve from VectorIO
+                        if not chunks and 'llamastack_client' in st.session_state:
+                            try:
+                                doc_name = doc.get('name', '')
+                                if doc_name:
+                                    # Get all chunks for this document from VectorIO
+                                    vectorio_results = st.session_state.llamastack_client.search_similar_vectors(
+                                        query_text=doc_name,
+                                        vector_db_id="faiss",
+                                        top_k=100
+                                    )
+                                    
+                                    # Handle VectorIO response format (dict with 'chunks' key)
+                                    if isinstance(vectorio_results, dict) and 'chunks' in vectorio_results:
+                                        vectorio_results = vectorio_results['chunks']
+                                    
+                                    # Filter and extract chunks
+                                    doc_chunks = []
+                                    for result in vectorio_results:
+                                        metadata = result.get('metadata', {})
+                                        result_doc_name = metadata.get('document_name', '')
+                                        
+                                        # Try multiple matching strategies
+                                        if (result_doc_name == doc_name or 
+                                            result_doc_name.endswith(doc_name) or
+                                            doc_name in result_doc_name or
+                                            result_doc_name.replace('Web Content from ', '').replace('https://', '').replace('http://', '').replace('/', '') == doc_name.replace('🌐 ', '').replace('📄 ', '')):
+                                            chunk_content = result.get('content', '')
+                                            if chunk_content:
+                                                doc_chunks.append(chunk_content)
+                                    
+                                    if doc_chunks:
+                                        chunks = doc_chunks
+                                        doc['chunks'] = chunks
+                                        st.success(f"✅ Retrieved {len(chunks)} chunks from VectorIO database")
+                            except Exception as e:
+                                st.error(f"❌ Could not retrieve chunks from VectorIO: {e}")
+                        
                         if chunks:
                             for j, chunk in enumerate(chunks):
                                 with st.expander(f"Chunk {j+1} ({len(chunk)} chars)", expanded=False):
                                     st.text(chunk)
                         else:
-                            st.info("No chunks available for this document.")
+                            st.info("No chunks available for this document in session state or VectorIO database.")
         
         else:
             st.info("🔍 No documents uploaded yet. Upload some documents above to get started!")
