@@ -52,7 +52,7 @@ providers:
     config:
       kvstore:
         type: sqlite
-        db_path: ./data/vectors/faiss_store.db
+        db_path: ../../data/vectors/faiss_store.db
   - provider_id: ${env.ENABLE_PGVECTOR+pgvector}
     provider_type: remote::pgvector
     config:

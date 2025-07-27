@@ -1,9 +1,19 @@
 """
-RAG LlamaStack Streamlit Application
-Main application entry point - now modular and clean!
+RAG LlamaStack Frontend Application
+A Streamlit-based interface for RAG (Retrieval-Augmented Generation) with LlamaStack
 """
 
+import os
+import sys
 import streamlit as st
+from pathlib import Path
+
+# Set environment variable to avoid tokenizers parallelism warning
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 # Import core modules
 from core.config import PAGE_CONFIG, LLAMASTACK_BASE, APP_DESCRIPTION
@@ -443,6 +453,56 @@ def load_bootstrap_css():
             color: var(--selectbox-text-color) !important;
         }
         
+        /* Nuclear option for selectbox visibility - Force black text in light theme */
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] span,
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] div,
+        .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] p,
+        .stSelectbox > div > div > div,
+        .stSelectbox > div > div > div > div,
+        .stSelectbox > div > div > div > div > div,
+        .stSelectbox > div > div > div > div > div > div,
+        .stSelectbox > div > div > div > div > div > div > div,
+        .stSelectbox > div > div > div > div > div > div > div > div,
+        .stSelectbox > div > div > div > div > div > div > div > div > div {
+            color: #000000 !important;
+        }
+        
+        /* Override any white text colors */
+        .stSelectbox [style*="color: white"],
+        .stSelectbox [style*="color: #ffffff"],
+        .stSelectbox [style*="color: rgb(255, 255, 255)"],
+        .stSelectbox [style*="color: rgba(255, 255, 255"] {
+            color: #000000 !important;
+        }
+        
+        /* Force all selectbox elements to have black text */
+        .stSelectbox * {
+            color: #000000 !important;
+        }
+        
+        /* Final nuclear option - Override ANY white text in selectbox */
+        .stSelectbox,
+        .stSelectbox *,
+        .stSelectbox > div,
+        .stSelectbox > div *,
+        .stSelectbox section,
+        .stSelectbox section *,
+        .stSelectbox [data-baseweb="select"],
+        .stSelectbox [data-baseweb="select"] *,
+        .stSelectbox [data-baseweb="popover"],
+        .stSelectbox [data-baseweb="popover"] *,
+        .stSelectbox [data-testid="stSelectbox"],
+        .stSelectbox [data-testid="stSelectbox"] * {
+            color: #000000 !important;
+        }
+        
+        /* Override any existing white color rules for selectbox */
+        .stSelectbox [style*="color: white"] { color: #000000 !important; }
+        .stSelectbox [style*="color: #ffffff"] { color: #000000 !important; }
+        .stSelectbox [style*="color: rgb(255, 255, 255)"] { color: #000000 !important; }
+        .stSelectbox [style*="color: rgba(255, 255, 255"] { color: #000000 !important; }
+        
         /* Streamlit alert compatibility - Dark theme */
         [data-theme="dark"] .stAlert {
             background-color: #0d1117 !important;
@@ -725,7 +785,9 @@ def render_sidebar():
         except ImportError:
             st.markdown("### 🗄️ FAISS Database")
             st.info("FAISS dashboard component not available")
-        
+            
+        # Connection Diagnostics & Debug Tools (Bottom of navbar)
+        st.markdown("---")
         # Quick setup info (collapsible)
         with st.expander("⚙️ Configuration & Help", expanded=False):
             st.markdown("""
@@ -745,8 +807,6 @@ def render_sidebar():
             - Mix file uploads with web URLs for comprehensive knowledge base
             """)
             
-        # Connection Diagnostics & Debug Tools (Bottom of navbar)
-        st.markdown("---")
         with st.expander("🔍 Connection Diagnostics & Debug", expanded=False):
             st.markdown("**Advanced troubleshooting tools**")
             

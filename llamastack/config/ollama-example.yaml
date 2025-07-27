@@ -50,15 +50,15 @@ models:
     embedding_dimension: 384
 
 # Ollama LLM models (install with: ollama pull <model>)
+- model_id: llama3.2:3b
+  provider_id: ollama
+  model_type: llm
+  provider_model_id: llama3.2:3b
+
 - model_id: llama3.2
   provider_id: ollama
   model_type: llm
   provider_model_id: llama3.2
-
-- model_id: llama3.2:3b
-  provider_id: ollama  
-  model_type: llm
-  provider_model_id: llama3.2:3b
 
 - model_id: codellama
   provider_id: ollama

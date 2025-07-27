@@ -56,7 +56,7 @@ def initialize_session_state() -> None:
         st.session_state.selected_embedding_model = "all-MiniLM-L6-v2"
     
     if 'selected_llm_model' not in st.session_state:
-        st.session_state.selected_llm_model = "llama3.2:1b"
+        st.session_state.selected_llm_model = "llama3.2:3b"
     
     # File processing tracking with interruption handling
     if 'processed_files' not in st.session_state:

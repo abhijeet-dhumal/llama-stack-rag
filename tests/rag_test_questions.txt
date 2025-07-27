@@ -1,0 +1,174 @@
+# RAG Test Questions Based on test_web_links.txt Content
+# These questions test knowledge that would only be available from the processed web URLs
+# NOT general LLM knowledge
+
+## Red Hat OpenShift AI Specific Questions
+# After processing https://www.redhat.com/en/topics/ai-ml/openshift-ai
+What specific features does Red Hat OpenShift AI offer according to their website?
+What are the key benefits of OpenShift AI mentioned on Red Hat's website?
+What are the system requirements for OpenShift AI listed on the Red Hat page?
+What are the specific use cases for OpenShift AI described on Red Hat's website?
+What are the pricing details or licensing information mentioned for OpenShift AI?
+What are the integration capabilities of OpenShift AI mentioned on the website?
+What are the security features of OpenShift AI described on Red Hat's page?
+
+## IBM AI Specific Questions
+# After processing https://www.ibm.com/topics/artificial-intelligence
+What specific AI solutions does IBM offer according to their website?
+What are the key AI technologies mentioned on IBM's AI page?
+What are the industry applications of IBM AI described on their website?
+What are the specific AI services or products listed on IBM's AI page?
+What are the research areas or innovations mentioned in IBM's AI content?
+What are the customer success stories or case studies described on IBM's AI page?
+
+## Microsoft AI Specific Questions
+# After processing https://www.microsoft.com/en-us/ai
+What specific AI services does Microsoft offer according to their website?
+What are the key AI capabilities mentioned on Microsoft's AI page?
+What are the specific AI tools or platforms described on Microsoft's website?
+What are the industry solutions for AI mentioned on Microsoft's page?
+What are the AI development resources or learning materials listed on Microsoft's site?
+What are the specific AI applications or use cases described on Microsoft's AI page?
+
+## Google AI Specific Questions
+# After processing https://www.google.com/ai/
+What specific AI projects or research does Google mention on their AI page?
+What are the key AI technologies or tools described on Google's AI website?
+What are the specific AI applications or products mentioned on Google's AI page?
+What are the AI research papers or publications referenced on Google's AI site?
+What are the specific AI capabilities or features described on Google's AI page?
+What are the AI development tools or resources mentioned on Google's AI website?
+
+## OpenAI Blog Specific Questions
+# After processing https://openai.com/blog/
+What are the latest blog posts or announcements mentioned on OpenAI's blog?
+What are the specific AI models or technologies discussed in recent blog posts?
+What are the research findings or breakthroughs described in OpenAI's blog?
+What are the specific applications or use cases mentioned in recent blog posts?
+What are the technical details or implementation guides described in the blog?
+What are the company updates or announcements mentioned in recent posts?
+
+## Streamlit Documentation Specific Questions
+# After processing https://docs.streamlit.io/
+What are the specific installation steps mentioned in the Streamlit documentation?
+What are the configuration options described in the Streamlit setup guide?
+What are the specific Streamlit components or widgets mentioned in the docs?
+What are the deployment options described in the Streamlit documentation?
+What are the troubleshooting steps listed in the Streamlit FAQ?
+What are the specific code examples provided in the Streamlit tutorials?
+What are the API reference details mentioned in the Streamlit documentation?
+
+## Python Documentation Specific Questions
+# After processing https://python.org/doc/
+What are the specific Python versions mentioned in the documentation?
+What are the installation instructions described in the Python docs?
+What are the specific Python features or modules mentioned in the documentation?
+What are the tutorials or learning resources listed in the Python docs?
+What are the specific code examples provided in the Python documentation?
+What are the best practices or guidelines mentioned in the Python docs?
+
+## PyTorch Documentation Specific Questions
+# After processing https://pytorch.org/docs/stable/index.html
+What are the specific PyTorch modules or functions mentioned in the documentation?
+What are the installation requirements described in the PyTorch docs?
+What are the specific tutorials or examples provided in the PyTorch documentation?
+What are the API reference details mentioned in the PyTorch docs?
+What are the specific PyTorch features or capabilities described in the documentation?
+What are the troubleshooting guides or FAQ mentioned in the PyTorch docs?
+
+## TensorFlow Documentation Specific Questions
+# After processing https://tensorflow.org/guide
+What are the specific TensorFlow guides or tutorials mentioned in the documentation?
+What are the installation instructions described in the TensorFlow guide?
+What are the specific TensorFlow APIs or functions mentioned in the docs?
+What are the code examples provided in the TensorFlow documentation?
+What are the specific TensorFlow features or capabilities described in the guide?
+What are the best practices or recommendations mentioned in the TensorFlow docs?
+
+## Scikit-learn Documentation Specific Questions
+# After processing https://scikit-learn.org/stable/
+What are the specific scikit-learn algorithms or models mentioned in the documentation?
+What are the installation requirements described in the scikit-learn docs?
+What are the specific tutorials or examples provided in the scikit-learn documentation?
+What are the API reference details mentioned in the scikit-learn docs?
+What are the specific scikit-learn features or capabilities described in the documentation?
+What are the best practices or guidelines mentioned in the scikit-learn docs?
+
+## Tech News Sites Specific Questions
+# After processing tech news sites (TechCrunch, The Verge, Wired, Engadget, ZDNet)
+What are the latest technology news articles mentioned on these websites?
+What are the specific tech companies or products discussed in recent articles?
+What are the industry trends or developments mentioned in the tech news?
+What are the specific product reviews or announcements described in the articles?
+What are the technology insights or analysis mentioned in the news content?
+What are the specific events or conferences mentioned in the tech news?
+
+## Developer Resources Specific Questions
+# After processing developer resource sites (GitHub, Stack Overflow, MDN, W3Schools, Dev.to)
+What are the trending repositories or projects mentioned on GitHub?
+What are the popular programming questions discussed on Stack Overflow?
+What are the specific web development topics covered in MDN documentation?
+What are the tutorials or learning resources mentioned on W3Schools?
+What are the developer articles or insights shared on Dev.to?
+What are the specific programming languages or frameworks discussed on these sites?
+
+## Cloud Platform Specific Questions
+# After processing cloud platform sites (AWS, Azure, Google Cloud, DigitalOcean, Heroku)
+What are the specific cloud services mentioned on each platform's website?
+What are the pricing details or plans described on the cloud platforms?
+What are the specific features or capabilities mentioned on each platform?
+What are the deployment options or tools described on the cloud platforms?
+What are the specific use cases or customer stories mentioned on the platforms?
+What are the integration capabilities or APIs described on the cloud platforms?
+
+## Data Science Platform Specific Questions
+# After processing data science sites (Kaggle, Tableau, Power BI, R Project, Jupyter)
+What are the specific datasets or competitions mentioned on Kaggle?
+What are the data visualization features described on Tableau's website?
+What are the business intelligence capabilities mentioned on Power BI's site?
+What are the specific R packages or functions mentioned in the R Project documentation?
+What are the Jupyter notebook features or extensions described on Jupyter's site?
+What are the specific tutorials or learning resources mentioned on these platforms?
+
+## Machine Learning Platform Specific Questions
+# After processing ML platform sites (Hugging Face, Kaggle, Fast.ai, Coursera, Udacity)
+What are the specific AI models or datasets mentioned on Hugging Face?
+What are the machine learning competitions or challenges described on Kaggle?
+What are the specific courses or learning paths mentioned on Fast.ai?
+What are the AI/ML courses or specializations listed on Coursera?
+What are the specific programs or nanodegrees mentioned on Udacity?
+What are the learning resources or tutorials described on these platforms?
+
+## Open Source Project Specific Questions
+# After processing open source sites (Linux, Apache, Mozilla, GNOME, KDE)
+What are the specific Linux distributions or versions mentioned on Linux.org?
+What are the Apache projects or software mentioned on Apache's website?
+What are the Mozilla products or initiatives described on Mozilla's site?
+What are the GNOME desktop features or applications mentioned on GNOME's site?
+What are the KDE desktop features or applications described on KDE's site?
+What are the specific development resources or documentation mentioned on these sites?
+
+## Cross-Platform Comparison Questions
+# After processing multiple related sites, ask comparison questions:
+How do the AI offerings from Red Hat, IBM, Microsoft, and Google compare?
+What are the differences between the cloud services offered by AWS, Azure, and Google Cloud?
+How do the machine learning platforms (Hugging Face, Kaggle, Fast.ai) differ in their offerings?
+What are the similarities and differences between the open source projects (Linux, Apache, Mozilla)?
+How do the data science platforms (Kaggle, Tableau, Power BI) compare in their capabilities?
+
+## Specific Technical Questions
+# Based on actual technical content from the processed URLs:
+What are the exact installation commands mentioned in the documentation?
+What are the specific configuration parameters described in the setup guides?
+What are the exact API endpoints or functions mentioned in the documentation?
+What are the specific error messages and their solutions listed in the docs?
+What are the exact code examples provided in the tutorials?
+What are the specific system requirements mentioned in the documentation?
+
+## Follow-up Questions for RAG Testing
+# After getting initial answers, ask follow-ups to test context retention:
+What else does the documentation say about [specific topic mentioned]?
+Can you provide more details about [specific feature mentioned]?
+What are the other options or alternatives mentioned in the documentation?
+What are the prerequisites or requirements for [specific process mentioned]?
+How does [specific feature] work according to the documentation? 

@@ -32,7 +32,8 @@ from .bootstrap_components import (
 
 from .faiss_dashboard import (
     render_faiss_dashboard,
-    get_faiss_stats
+    get_vectorio_stats,
+    get_faiss_index_stats
 )
 
 __all__ = [
@@ -63,5 +64,6 @@ __all__ = [
     'render_bootstrap_ollama_integration',
     # FAISS Dashboard components
     'render_faiss_dashboard',
-    'get_faiss_stats'
+    'get_vectorio_stats',
+    'get_faiss_index_stats'
 ]
