@@ -1,7 +1,7 @@
 # 🦙 **RAG LlamaStack - Streamlit Edition**
 
-> **A modern, intelligent RAG application with real-time document processing**  
-> Built with LlamaStack orchestration and Streamlit for seamless AI interactions
+> **A modern, intelligent RAG application with persistent vector storage and real-time document processing**  
+> Built with LlamaStack orchestration, FAISS vector database, and Streamlit for seamless AI interactions
 
 ## ⚡ **30-Second Start**
 
@@ -33,6 +33,7 @@ make start-frontend
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io)
 [![LlamaStack](https://img.shields.io/badge/LlamaStack-Latest-green.svg)](https://github.com/meta-llama/llama-stack)
+[![FAISS](https://img.shields.io/badge/FAISS-VectorDB-orange.svg)](https://github.com/facebookresearch/faiss)
 
 ---
 
@@ -58,12 +59,22 @@ make start-frontend
 - **⚡ Real-time Processing** - Live progress tracking and performance metrics
 - **🎨 Modern UI** - Dark/light theme with responsive design
 
+### 🗄️ **Vector Database Integration (NEW!)**
+- **📊 FAISS Vector Database** - Persistent storage with LlamaStack VectorIO API
+- **🔍 Advanced Search** - Semantic similarity search with configurable thresholds
+- **📈 Database Dashboard** - Comprehensive FAISS management interface
+- **🔄 CRUD Operations** - Create, Read, Update, Delete vector database entries
+- **📊 Statistics & Analytics** - Detailed database metrics and insights
+- **🧹 Data Management** - Clear all data or delete specific sources
+- **🔍 Search Interface** - Direct vector database querying and testing
+
 ### 🛠️ **Advanced Features**
 - **📊 System Status Monitoring** - Real-time LlamaStack and Ollama health checks
 - **🩺 Connection Diagnostics** - Smart endpoint detection and troubleshooting
 - **📈 Performance Analytics** - Detailed processing metrics and statistics
 - **🔄 Upload State Management** - Interrupt-resistant file processing
 - **🔍 Debug Tools** - Comprehensive system diagnostics and logging
+- **📄 Document Content Viewing** - View source documents with enhanced matching logic
 
 ### 🧠 **AI Integration**
 - **🦙 LlamaStack Orchestration** - Unified API for inference and embeddings
@@ -72,8 +83,9 @@ make start-frontend
 - **🔀 Fallback Systems** - Multiple AI provider support with auto-switching
 - **📋 Smart Model Filtering** - Only shows models actually available in your Ollama installation
 - **🔧 Enhanced Error Handling** - Robust numpy array handling and type conversion
+- **💾 Persistent Storage** - Vector embeddings stored in FAISS database via VectorIO API
 
-### 🌐 **Web Content Processing (NEW!)**
+### 🌐 **Web Content Processing**
 - **🔧 MCP Server Integration** - Uses @just-every/mcp-read-website-fast for clean content extraction
 - **📝 Mozilla Readability** - Advanced web content parsing with readability optimization
 - **🔄 Smart Fallback** - BeautifulSoup + requests backup when MCP server unavailable
@@ -81,21 +93,30 @@ make start-frontend
 - **🎯 Multiple Sources** - Mix file uploads and web URLs in the same knowledge base
 - **🔍 Debug Logging** - Comprehensive logging for troubleshooting web processing issues
 - **🛠️ MCP Command Integration** - Automatic setup and testing of web extraction tools
+- **📦 Bulk URL Processing** - Process multiple URLs from text files with progress tracking
+
+### 🎨 **Enhanced UI/UX**
+- **🌓 Theme Toggle** - Dark/light mode with persistent preferences
+- **📱 Responsive Design** - Optimized for desktop and mobile devices
+- **🎯 Improved Layout** - Better component organization and spacing
+- **📊 FAISS Dashboard** - Professional vector database management interface
+- **🔍 Document Viewer** - Enhanced source document viewing with content matching
+- **📈 Real-time Metrics** - Live performance and statistics updates
 
 ---
 
 ## 📸 **Screenshots**
 
 ### **Main Application Interface**
-![Main Interface](data/images/Screenshot_2025-07-20_at_11.11.29 PM.png)
+![Main Interface](./data/images/Screenshot_2025-07-20_at_11.11.29 PM.png)
 *Clean, modern interface with sidebar controls and main chat area*
 
 ### **Document Processing & Chat**
-![Document Processing](/data/images/Screenshot_2025-07-20_at_11.12.41 PM.png) 
+![Document Processing](./data/images/Screenshot_2025-07-20_at_11.12.41%20PM.png) 
 *Real-time document processing with performance metrics and intelligent chat responses*
 
 ### **System Status & Diagnostics**
-![System Status](/data/images/Screenshot_2025-07-20_at_11.13.52 PM.png)
+![System Status](./data/images/Screenshot_2025-07-20_at_11.13.52%20PM.png)
 *Comprehensive system monitoring with LlamaStack and Ollama status indicators*
 
 ---
@@ -111,6 +132,7 @@ graph TB
         UPLOAD[📁 File Upload<br/>PDF, DOCX, PPTX, TXT, MD<br/>Max 50MB per file]
         WEB_URL[🌐 Web URL Processing<br/>MCP Server + BeautifulSoup<br/>Real-time extraction]
         CHAT[💬 Chat Interface<br/>Session State<br/>Source Citations]
+        DASH[📊 FAISS Dashboard<br/>Vector Database Management<br/>CRUD Operations]
     end
     
     subgraph "🧠 Core Processing"
@@ -124,12 +146,13 @@ graph TB
         LS_CLIENT[🔗 LlamaStack Client<br/>Port: 8321<br/>Unified API]
         EMBED_API[🧮 Embeddings<br/>all-MiniLM-L6-v2<br/>384 dimensions]
         CHAT_API[💬 Chat Completion<br/>Ollama provider<br/>Fallback systems]
+        VECTOR_IO[🗄️ VectorIO API<br/>FAISS Integration<br/>Persistent Storage]
         OLLAMA[🦙 Ollama Server<br/>Port: 11434<br/>Local LLM models]
     end
     
     subgraph "💾 Storage & State"
         SESSION[🔄 Session State<br/>Browser persistence<br/>Auto cleanup]
-        VECTOR_DB[🗄️ Vector Storage<br/>JSON format<br/>Session-based]
+        FAISS_DB[🗄️ FAISS Database<br/>SQLite backend<br/>Persistent vectors]
         DOC_STORE[📊 Document Storage<br/>Auto-save<br/>Restore on reload]
     end
     
@@ -137,6 +160,7 @@ graph TB
     UI --> UPLOAD
     UI --> WEB_URL
     UI --> CHAT
+    UI --> DASH
     
     %% Processing Flow
     UPLOAD --> DOC_HANDLER
@@ -149,18 +173,21 @@ graph TB
     CHAT_ENGINE --> LS_CLIENT
     LS_CLIENT --> EMBED_API
     LS_CLIENT --> CHAT_API
+    LS_CLIENT --> VECTOR_IO
     LS_CLIENT --> OLLAMA
     
     %% Storage
     DOC_HANDLER --> SESSION
     CHAT_ENGINE --> SESSION
-    SESSION --> VECTOR_DB
+    SESSION --> FAISS_DB
     SESSION --> DOC_STORE
+    VECTOR_IO --> FAISS_DB
     
     style UI fill:#e3f2fd
     style LS_CLIENT fill:#fff3e0
     style OLLAMA fill:#e8f5e8
     style SESSION fill:#fce4ec
+    style FAISS_DB fill:#fff8e1
 ```
 
 ### **Technology Stack**
@@ -185,6 +212,7 @@ graph LR
         ST_EMB[Sentence Transformers]
         OL[Ollama]
         HF[Hugging Face]
+        FAISS[FAISS Vector DB]
     end
     
     subgraph "📊 Data Processing"
@@ -209,6 +237,7 @@ graph LR
     BS --> MD
     LS --> ST_EMB
     LS --> OL
+    LS --> FAISS
     ST_EMB --> HF
     DOC --> PDF
     DOC --> CHUNK
@@ -229,7 +258,7 @@ flowchart TD
         EXTRACT[📄 Content Extraction<br/>Multi-format support<br/>Docling + PyPDF2]
         CHUNK[✂️ Smart Chunking<br/>3000 chars + 600 overlap<br/>Optimized for RAG]
         EMBED[🧮 Embedding Generation<br/>all-MiniLM-L6-v2<br/>384 dimensions]
-        STORE[💾 Vector Storage<br/>Session state<br/>JSON format]
+        STORE[💾 Vector Storage<br/>FAISS Database<br/>Persistent via VectorIO]
     end
     
     subgraph "🔍 Query Processing"
@@ -257,6 +286,7 @@ flowchart TD
     style RESPONSE fill:#e8f5e8
     style EMBED fill:#fff3e0
     style SEARCH fill:#f3e5f5
+    style STORE fill:#fff8e1
 ```
 
 ---
@@ -299,6 +329,7 @@ streamlit run frontend/streamlit/app.py --server.port 8501
    - 📄 **Upload Documents** using the file uploader (PDF, DOCX, PPTX, TXT, MD)
    - 🌐 **Process Web URLs** by entering any web link for real-time content extraction
 4. **Start Chatting** with your documents and web content!
+5. **Manage Vector Database** using the FAISS Dashboard in the sidebar
 
 ---
 
@@ -312,6 +343,7 @@ The application provides comprehensive monitoring:
 - **🟢 Ollama** - Local model availability  
 - **📊 Performance Metrics** - Processing speed and quality
 - **🔍 Debug Information** - Configuration and state details
+- **🗄️ FAISS Database** - Vector database status and statistics
 
 ### **Document Processing Metrics**
 
@@ -323,6 +355,19 @@ Each upload provides detailed analytics:
 | **Embedding Quality** | Success rate percentage | 95-100% |
 | **Chunk Efficiency** | Characters per chunk | 2500-3500 |
 | **Memory Usage** | Session state size | <50MB |
+| **Vector Storage** | FAISS database entries | Persistent |
+
+### **FAISS Database Statistics**
+
+The vector database provides comprehensive metrics:
+
+| Metric | Description | Typical Range |
+|--------|-------------|---------------|
+| **Total Sources** | Number of unique documents | 1-1000+ |
+| **Total Vectors** | Number of embedded chunks | 1-10000+ |
+| **Web Sources** | Web content documents | 0-500+ |
+| **File Sources** | Uploaded file documents | 0-500+ |
+| **Database Size** | FAISS database file size | 1MB-1GB+ |
 
 ### **Performance Optimization**
 
@@ -331,6 +376,7 @@ The system automatically optimizes for:
 - **Slow Networks**: Fallback systems and local processing
 - **Memory**: Efficient chunk management and cleanup
 - **Speed**: Parallel operations and smart caching
+- **Persistence**: FAISS database for long-term storage
 
 ---
 
@@ -341,7 +387,7 @@ The system automatically optimizes for:
 ```python
 # Model Configuration
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-DEFAULT_LLM_MODEL = "llama3.2:1b"
+DEFAULT_LLM_MODEL = "llama3.2:3b"
 
 # Processing Configuration  
 CHARS_PER_CHUNK = 3000
@@ -349,9 +395,12 @@ CHUNK_OVERLAP = 600
 MAX_RELEVANT_CHUNKS = 4
 
 # Performance Configuration
-MIN_SIMILARITY_THRESHOLD = 0.25
+MIN_SIMILARITY_THRESHOLD = 0.3
 LLM_TEMPERATURE = 0.4
 LLM_MAX_TOKENS = 1024
+
+# Vector Database Configuration
+TOP_SOURCES_COUNT = 3
 ```
 
 ### **Streamlit Configuration** (`.streamlit/config.toml`)
@@ -381,6 +430,7 @@ apis:
   - agents
   - memory
   - telemetry
+  - vector_io
 
 providers:
   inference:
@@ -388,6 +438,12 @@ providers:
       provider_type: remote::ollama
       config:
         url: http://localhost:11434
+  vector_io:
+    - provider_id: faiss
+      provider_type: faiss
+      config:
+        db_path: ../../data/vectors/faiss_store.db
+        kvstore: sqlite
 ```
 
 ---
@@ -438,6 +494,19 @@ make restart
 cat llamastack/config/llamastack-config.yaml
 ```
 
+#### 🔴 **FAISS Database Issues**
+```bash
+# Check FAISS database status
+curl http://localhost:8321/v1/vector-dbs/faiss
+
+# Recreate FAISS database if needed
+curl -X DELETE http://localhost:8321/v1/vector-dbs/faiss
+curl -X POST http://localhost:8321/v1/vector-dbs -H "Content-Type: application/json" -d '{"vector_db_id": "faiss", "embedding_model": "all-MiniLM-L6-v2"}'
+
+# Check database file
+ls -la data/vectors/
+```
+
 #### 🔴 **Services Not Running**
 ```bash
 # Error: "LlamaStack offline" or "Ollama not found"
@@ -462,7 +531,7 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
 
 # Pull a model
-ollama pull llama3.2:1b
+ollama pull llama3.2:3b
 ```
 
 #### 🔴 **Web URL Processing Issues**
@@ -476,6 +545,11 @@ npm install @just-every/mcp-read-website-fast
 # Check Node.js version (requires >=16.0.0)
 node --version
 ```
+
+#### 🔴 **"Content not available" in Document Viewer**
+- **Cause**: Document name matching issues between session state and vector database
+- **Fix**: ✅ **Resolved** - Enhanced matching logic with multiple strategies
+- **Status**: Document content viewing now works with web content and file uploads
 
 #### 🔴 **"unknown command read-website" Error**
 - **Cause**: Incorrect MCP command format
@@ -504,6 +578,11 @@ node --version
 - Verify model configuration
 - Use connection diagnostics
 
+#### 🔴 **Duplicate Key Errors in Streamlit**
+- **Cause**: Non-unique keys for text areas in document viewer
+- **Fix**: ✅ **Resolved** - Unique keys using message and document indices
+- **Status**: Document viewer now works without key conflicts
+
 ### **Debug Mode**
 
 Enable detailed logging:
@@ -523,13 +602,15 @@ The application includes comprehensive debug logging:
 - **Similarity Calculation**: Monitor cosine similarity computations  
 - **Web Processing**: Log MCP server calls and fallback usage
 - **Error Handling**: Detailed error messages with context
+- **Vector Database**: FAISS operations and VectorIO API calls
 
 ### **Getting Help**
 
 1. **Connection Diagnostics** - Use the built-in diagnostic tools
 2. **Performance Metrics** - Check the detailed performance tables
 3. **Debug Information** - Use the debug panel in the sidebar
-4. **Logs** - Check `logs/` directory for detailed error logs
+4. **FAISS Dashboard** - Monitor vector database status and operations
+5. **Logs** - Check `logs/` directory for detailed error logs
 
 ---
 
@@ -557,4 +638,4 @@ If you find this project useful, please consider giving it a star! ⭐
 
 ---
 
-*Built with ❤️ using LlamaStack, Streamlit, and modern AI technologies*
+*Built with ❤️ using LlamaStack, Ollama, FAISS, Streamlit, and modern AI technologies*

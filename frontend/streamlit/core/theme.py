@@ -2130,5 +2130,81 @@ def inject_light_theme_css():
     .theme-toggle-small .stButton button:hover {
         background: rgba(255, 255, 255, 1) !important;
     }
+    
+    /* Light Theme Selectbox Fixes - Force black text */
+    .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"],
+    .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] span,
+    .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] div,
+    .stSelectbox [data-baseweb="select"] [data-testid="stSelectbox"] p,
+    .stSelectbox > div > div > div,
+    .stSelectbox > div > div > div > div,
+    .stSelectbox > div > div > div > div > div,
+    .stSelectbox > div > div > div > div > div > div,
+    .stSelectbox > div > div > div > div > div > div > div,
+    .stSelectbox > div > div > div > div > div > div > div > div,
+    .stSelectbox > div > div > div > div > div > div > div > div > div {
+        color: #000000 !important;
+    }
+    
+    /* Light theme selectbox dropdown options */
+    .stSelectbox [data-baseweb="popover"] li,
+    .stSelectbox [data-baseweb="popover"] div,
+    .stSelectbox [data-baseweb="popover"] span {
+        color: #000000 !important;
+    }
+    
+    /* Light theme selectbox label */
+    .stSelectbox label {
+        color: var(--text-color) !important;
+    }
+    
+    /* Comprehensive light theme selectbox override - Nuclear option */
+    body:not([data-theme="dark"]) .stSelectbox *,
+    html body:not([data-theme="dark"]) .stSelectbox *,
+    .stApp:not([data-theme="dark"]) .stSelectbox * {
+        color: #000000 !important;
+    }
+    
+    /* Force selectbox text visibility in light theme */
+    .stSelectbox [data-baseweb="select"] > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div > div > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div > div > div > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div > div > div > div > div > div,
+    .stSelectbox [data-baseweb="select"] > div > div > div > div > div > div > div > div > div {
+        color: #000000 !important;
+    }
+    
+    /* Override any inline styles that might be setting white text */
+    .stSelectbox [style*="color: white"],
+    .stSelectbox [style*="color: #ffffff"],
+    .stSelectbox [style*="color: rgb(255, 255, 255)"],
+    .stSelectbox [style*="color: rgba(255, 255, 255"] {
+        color: #000000 !important;
+    }
+    
+    /* Final nuclear option - Override ANY white text in selectbox */
+    .stSelectbox,
+    .stSelectbox *,
+    .stSelectbox > div,
+    .stSelectbox > div *,
+    .stSelectbox section,
+    .stSelectbox section *,
+    .stSelectbox [data-baseweb="select"],
+    .stSelectbox [data-baseweb="select"] *,
+    .stSelectbox [data-baseweb="popover"],
+    .stSelectbox [data-baseweb="popover"] *,
+    .stSelectbox [data-testid="stSelectbox"],
+    .stSelectbox [data-testid="stSelectbox"] * {
+        color: #000000 !important;
+    }
+    
+    /* Override any existing white color rules for selectbox */
+    .stSelectbox [style*="color: white"] { color: #000000 !important; }
+    .stSelectbox [style*="color: #ffffff"] { color: #000000 !important; }
+    .stSelectbox [style*="color: rgb(255, 255, 255)"] { color: #000000 !important; }
+    .stSelectbox [style*="color: rgba(255, 255, 255"] { color: #000000 !important; }
     </style>
     """, unsafe_allow_html=True) 

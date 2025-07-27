@@ -1,0 +1,56 @@
+# Test Web Links for Bulk Processing
+# Technology and AI Articles
+https://www.redhat.com/en/topics/ai-ml/openshift-ai
+https://www.ibm.com/topics/artificial-intelligence
+https://www.microsoft.com/en-us/ai
+https://www.google.com/ai/
+https://openai.com/blog/
+
+# Documentation and Learning Resources
+https://docs.streamlit.io/
+https://python.org/doc/
+https://pytorch.org/docs/stable/index.html
+https://tensorflow.org/guide
+https://scikit-learn.org/stable/
+
+# News and Information Sites
+https://techcrunch.com/
+https://www.theverge.com/
+https://www.wired.com/
+https://www.engadget.com/
+https://www.zdnet.com/
+
+# Developer Resources
+https://github.com/
+https://stackoverflow.com/
+https://developer.mozilla.org/
+https://www.w3schools.com/
+https://dev.to/
+
+# Cloud and Infrastructure
+https://aws.amazon.com/
+https://azure.microsoft.com/
+https://cloud.google.com/
+https://www.digitalocean.com/
+https://www.heroku.com/
+
+# Data Science and Analytics
+https://www.kaggle.com/
+https://www.tableau.com/
+https://powerbi.microsoft.com/
+https://www.r-project.org/
+https://jupyter.org/
+
+# Machine Learning Platforms
+https://huggingface.co/
+https://www.kaggle.com/
+https://www.fast.ai/
+https://www.coursera.org/
+https://www.udacity.com/
+
+# Open Source Projects
+https://www.linux.org/
+https://www.apache.org/
+https://www.mozilla.org/
+https://www.gnome.org/
+https://www.kde.org/ 

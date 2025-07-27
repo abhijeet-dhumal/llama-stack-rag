@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def render_welcome_screen() -> None:
-    """Display welcome screen when no documents are uploaded"""
+    """Display the welcome screen with enhanced UI and feature highlights"""
     
     # Center content with padding
     st.markdown("<br>" * 2, unsafe_allow_html=True)
@@ -92,7 +92,7 @@ def render_welcome_screen() -> None:
         - Local Ollama models for privacy
         - Real-time performance analytics
         """)
-    
+
     st.markdown("<br>" * 2, unsafe_allow_html=True)
 
 
@@ -234,6 +234,14 @@ def render_chat_interface() -> None:
     
     # Chat history display
     if st.session_state.chat_history:
+        # Debug: Show what's in chat history
+        print(f"🔍 DEBUG: Chat history has {len(st.session_state.chat_history)} messages")
+        for i, msg in enumerate(st.session_state.chat_history):
+            if msg.get('role') == 'assistant' and 'sources' in msg:
+                print(f"🔍 DEBUG: Message {i} has {len(msg['sources'])} sources")
+                for j, source in enumerate(msg['sources']):
+                    print(f"🔍 DEBUG: Source {j}: {source}")
+        
         # Prepare document content for JavaScript
         document_contents = {}
         source_relevances = {}
@@ -251,10 +259,198 @@ def render_chat_interface() -> None:
                     if 'uploaded_documents' in st.session_state:
                         all_documents.extend(st.session_state.uploaded_documents)
                     
+                    print(f"🔍 DEBUG: Looking for document '{doc_name}'")
+                    print(f"🔍 DEBUG: Available documents in session state: {len(all_documents)}")
+                    for i, doc in enumerate(all_documents):
+                        doc_name_in_state = doc.get('name', 'Unknown')
+                        print(f"🔍 DEBUG: Document {i}: '{doc_name_in_state}'")
+                    
                     # Find the document and get its content
                     for doc in all_documents:
-                        if doc.get('name') == doc_name:
-                            content = doc.get('content', 'Content not available')
+                        doc_name_in_state = doc.get('name', '')
+                        
+                        # Enhanced matching logic for different naming conventions
+                        matched = False
+                        
+                        # Strategy 1: Exact match
+                        if doc_name_in_state == doc_name:
+                            matched = True
+                            print(f"🔍 DEBUG: Exact match found: '{doc_name_in_state}'")
+                        
+                        # Strategy 2: Handle web content with full URL vs domain
+                        elif (doc_name.startswith('Web Content from ') and 
+                              doc_name_in_state.startswith('🌐 ')):
+                            # Extract domain from full URL
+                            try:
+                                from urllib.parse import urlparse
+                                full_url = doc_name.replace('Web Content from ', '')
+                                domain = urlparse(full_url).netloc
+                                state_domain = doc_name_in_state.replace('🌐 ', '')
+                                if domain == state_domain:
+                                    matched = True
+                                    print(f"🔍 DEBUG: Web content domain match: '{domain}' == '{state_domain}'")
+                            except:
+                                pass
+                        
+                        # Strategy 3: Handle emoji prefixes
+                        elif (doc_name.replace('📄 ', '').replace('🌐 ', '') == doc_name_in_state.replace('📄 ', '').replace('🌐 ', '')):
+                            matched = True
+                            print(f"🔍 DEBUG: Emoji prefix match: '{doc_name}' vs '{doc_name_in_state}'")
+                        
+                        # Strategy 4: Substring matching
+                        elif (doc_name_in_state.replace('📄 ', '').replace('🌐 ', '') in doc_name or
+                              doc_name.replace('📄 ', '').replace('🌐 ', '') in doc_name_in_state):
+                            matched = True
+                            print(f"🔍 DEBUG: Substring match: '{doc_name}' contains '{doc_name_in_state}'")
+                        
+                        if matched:
+                            # Try different content fields
+                            content = None
+                            if 'content' in doc:
+                                content = doc['content']
+                            elif 'chunks' in doc and doc['chunks']:
+                                # If content is chunked, combine chunks
+                                chunk_contents = []
+                                for chunk in doc['chunks']:
+                                    if isinstance(chunk, dict):
+                                        # Extract content from chunk dictionary
+                                        chunk_content = chunk.get('content', '')
+                                        if chunk_content:
+                                            chunk_contents.append(chunk_content)
+                                    elif isinstance(chunk, str):
+                                        # Direct string chunk
+                                        chunk_contents.append(chunk)
+                                content = '\n\n'.join(chunk_contents) if chunk_contents else None
+                            elif 'source_url' in doc:
+                                # For web content, show URL and any available content
+                                content = f"Web content from: {doc.get('source_url', 'Unknown URL')}\n\n"
+                                if 'chunks' in doc and doc['chunks']:
+                                    content += '\n\n'.join(doc['chunks'][:3])  # Show first 3 chunks
+                                    if len(doc['chunks']) > 3:
+                                        content += f"\n\n... and {len(doc['chunks']) - 3} more chunks"
+                            
+                            if not content:
+                                # Try to get content from VectorIO if available
+                                try:
+                                    if 'llamastack_client' in st.session_state:
+                                        print(f"🔍 DEBUG: Looking for document '{doc_name}' in VectorIO")
+                                        
+                                        # Search VectorIO for this document with improved matching
+                                        search_results = st.session_state.llamastack_client.search_similar_vectors(
+                                            query_text=doc_name,
+                                            vector_db_id="faiss",
+                                            top_k=10
+                                        )
+                                        
+                                        # Handle VectorIO response format
+                                        if isinstance(search_results, dict) and 'chunks' in search_results:
+                                            search_results = search_results['chunks']
+                                        
+                                        print(f"🔍 DEBUG: Found {len(search_results) if search_results else 0} results from VectorIO")
+                                        
+                                        if search_results:
+                                            # Show what we found for debugging
+                                            print(f"🔍 DEBUG: Sample results:")
+                                            for i, result in enumerate(search_results[:3]):
+                                                metadata = result.get('metadata', {})
+                                                result_doc_name = metadata.get('document_name', 'Unknown')
+                                                result_doc_id = metadata.get('document_id', 'Unknown')
+                                                print(f"  {i+1}. doc_name: '{result_doc_name}', doc_id: '{result_doc_id}'")
+                                            
+                                            # Filter results to only include chunks from this document
+                                            doc_chunks = []
+                                            for result in search_results:
+                                                metadata = result.get('metadata', {})
+                                                result_doc_name = metadata.get('document_name', '')
+                                                result_doc_id = metadata.get('document_id', '')
+                                                
+                                                # Enhanced matching strategies
+                                                matched = False
+                                                
+                                                # Strategy 1: Exact match
+                                                if result_doc_name == doc_name:
+                                                    matched = True
+                                                    print(f"🔍 DEBUG: Matched via exact name: '{result_doc_name}'")
+                                                
+                                                # Strategy 2: Remove emoji prefixes and compare
+                                                elif (result_doc_name == doc_name.replace('📄 ', '').replace('🌐 ', '') or
+                                                      doc_name == result_doc_name.replace('📄 ', '').replace('🌐 ', '')):
+                                                    matched = True
+                                                    print(f"🔍 DEBUG: Matched via emoji removal: '{result_doc_name}' vs '{doc_name}'")
+                                                
+                                                # Strategy 3: Check if doc_name contains the filename
+                                                elif (doc_name.replace('📄 ', '').replace('🌐 ', '') in result_doc_name or
+                                                      result_doc_name in doc_name.replace('📄 ', '').replace('🌐 ', '')):
+                                                    matched = True
+                                                    print(f"🔍 DEBUG: Matched via substring: '{result_doc_name}' contains '{doc_name}'")
+                                                
+                                                # Strategy 4: Check document_id patterns
+                                                elif doc_name.replace('📄 ', '').replace('🌐 ', '') in result_doc_id:
+                                                    matched = True
+                                                    print(f"🔍 DEBUG: Matched via doc_id: '{result_doc_id}' contains '{doc_name}'")
+                                                
+                                                # Strategy 5: For web content, check URL patterns
+                                                elif (doc_name.startswith('🌐 ') and 
+                                                      result_doc_name.startswith('Web Content from')):
+                                                    # Extract domain from both and compare
+                                                    try:
+                                                        from urllib.parse import urlparse
+                                                        doc_domain = doc_name.replace('🌐 ', '')
+                                                        result_url = result_doc_name.replace('Web Content from ', '')
+                                                        result_domain = urlparse(result_url).netloc
+                                                        if doc_domain == result_domain:
+                                                            matched = True
+                                                            print(f"🔍 DEBUG: Matched via domain: '{doc_domain}' == '{result_domain}'")
+                                                    except:
+                                                        pass
+                                                
+                                                # Strategy 6: Handle case where chat adds 📄 to web content
+                                                elif (doc_name.startswith('📄 ') and 
+                                                      doc_name.replace('📄 ', '') == result_doc_name):
+                                                    matched = True
+                                                    print(f"🔍 DEBUG: Matched via 📄 removal: '{result_doc_name}' vs '{doc_name}'")
+                                                
+                                                # Strategy 7: Handle case where chat adds 🌐 to web content
+                                                elif (doc_name.startswith('🌐 ') and 
+                                                      doc_name.replace('🌐 ', '') == result_doc_name):
+                                                    matched = True
+                                                    print(f"🔍 DEBUG: Matched via 🌐 removal: '{result_doc_name}' vs '{doc_name}'")
+                                                
+                                                # Strategy 8: Handle case where chat adds 📄 to web content URLs
+                                                elif (doc_name.startswith('📄 Web Content from ') and 
+                                                      result_doc_name.startswith('Web Content from ')):
+                                                    # Remove the 📄 prefix and compare
+                                                    if doc_name.replace('📄 ', '') == result_doc_name:
+                                                        matched = True
+                                                        print(f"🔍 DEBUG: Matched via 📄 Web Content removal: '{result_doc_name}' vs '{doc_name}'")
+                                                
+                                                if matched:
+                                                    chunk_content = result.get('content', '')
+                                                    if chunk_content:
+                                                        doc_chunks.append(chunk_content)
+                                                        print(f"🔍 DEBUG: Added chunk {len(doc_chunks)} for document")
+                                            
+                                            print(f"🔍 DEBUG: Total matching chunks found: {len(doc_chunks)}")
+                                            
+                                            if doc_chunks:
+                                                content = "Content from VectorIO database:\n\n"
+                                                for i, chunk in enumerate(doc_chunks[:3]):
+                                                    content += f"Chunk {i+1}: {chunk}\n\n"
+                                                if len(doc_chunks) > 3:
+                                                    content += f"... and {len(doc_chunks) - 3} more chunks"
+                                            else:
+                                                # Debug info
+                                                debug_info = f"Debug: Looking for '{doc_name}', found {len(search_results)} results"
+                                                if search_results:
+                                                    sample_names = [r.get('metadata', {}).get('document_name', 'Unknown')[:50] for r in search_results[:3]]
+                                                    debug_info += f", sample names: {sample_names}"
+                                                content = f'Content not available (no matching chunks found for "{doc_name}" in VectorIO). {debug_info}'
+                                        else:
+                                            content = 'Content not available (no results from VectorIO)'
+                                except Exception as e:
+                                    print(f"🔍 DEBUG: VectorIO error: {e}")
+                                    content = f'Content not available (VectorIO error: {str(e)})'
+                            
                             # Truncate for modal display
                             if len(content) > 2000:
                                 content = content[:2000] + "...\n\n[Content truncated for display]"
@@ -263,12 +459,18 @@ def render_chat_interface() -> None:
         
         # Inject document content into JavaScript
         if document_contents:
+            print(f"🔍 DEBUG: Preparing {len(document_contents)} documents for JavaScript modal")
+            for doc_name, content in document_contents.items():
+                print(f"🔍 DEBUG: Document '{doc_name}': {len(content)} chars, preview: {content[:100]}...")
+            
             st.markdown(f"""
             <script>
             window.documentContents = {document_contents};
             window.sourceRelevances = {source_relevances};
             </script>
             """, unsafe_allow_html=True)
+        else:
+            print("🔍 DEBUG: No document contents prepared for JavaScript modal")
         
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
         
@@ -324,48 +526,94 @@ def render_chat_interface() -> None:
                             doc_name = source['document']
                             relevance_pct = source['score'] * 100
                             
-                            # Find document content
-                            all_documents = []
-                            if 'documents' in st.session_state:
-                                all_documents.extend(st.session_state.documents)
-                            if 'uploaded_documents' in st.session_state:
-                                all_documents.extend(st.session_state.uploaded_documents)
-                            
+                            # Use the same enhanced content retrieval logic as the JavaScript modal
                             doc_content = "Content not available"
-                            for doc in all_documents:
-                                if doc.get('name') == doc_name:
-                                    doc_content = doc.get('content', 'Content not available')
-                                    break
+                            
+                            # First try to get content from the prepared document_contents
+                            if 'document_contents' in locals() and doc_name in document_contents:
+                                doc_content = document_contents[doc_name]
+                            else:
+                                # Fallback to session state lookup with enhanced matching
+                                all_documents = []
+                                if 'documents' in st.session_state:
+                                    all_documents.extend(st.session_state.documents)
+                                if 'uploaded_documents' in st.session_state:
+                                    all_documents.extend(st.session_state.uploaded_documents)
+                                
+                                for doc in all_documents:
+                                    doc_name_in_state = doc.get('name', '')
+                                    
+                                    # Enhanced matching logic (same as JavaScript modal)
+                                    matched = False
+                                    
+                                    # Strategy 1: Exact match
+                                    if doc_name_in_state == doc_name:
+                                        matched = True
+                                    
+                                    # Strategy 2: Handle web content with full URL vs domain
+                                    elif (doc_name.startswith('Web Content from ') and 
+                                          doc_name_in_state.startswith('🌐 ')):
+                                        try:
+                                            from urllib.parse import urlparse
+                                            full_url = doc_name.replace('Web Content from ', '')
+                                            domain = urlparse(full_url).netloc
+                                            state_domain = doc_name_in_state.replace('🌐 ', '')
+                                            if domain == state_domain:
+                                                matched = True
+                                        except:
+                                            pass
+                                    
+                                    # Strategy 3: Handle emoji prefixes
+                                    elif (doc_name.replace('📄 ', '').replace('🌐 ', '') == doc_name_in_state.replace('📄 ', '').replace('🌐 ', '')):
+                                        matched = True
+                                    
+                                    # Strategy 4: Substring matching
+                                    elif (doc_name_in_state.replace('📄 ', '').replace('🌐 ', '') in doc_name or
+                                          doc_name.replace('📄 ', '').replace('🌐 ', '') in doc_name_in_state):
+                                        matched = True
+                                    
+                                    if matched:
+                                        # Try different content fields
+                                        content = None
+                                        if 'content' in doc and doc['content']:
+                                            content = doc['content']
+                                        elif 'chunks' in doc and doc['chunks']:
+                                            # If content is chunked, combine chunks
+                                            chunk_contents = []
+                                            for chunk in doc['chunks']:
+                                                if isinstance(chunk, dict):
+                                                    # Extract content from chunk dictionary
+                                                    chunk_content = chunk.get('content', '')
+                                                    if chunk_content:
+                                                        chunk_contents.append(chunk_content)
+                                                elif isinstance(chunk, str):
+                                                    # Direct string chunk
+                                                    chunk_contents.append(chunk)
+                                            content = '\n\n'.join(chunk_contents) if chunk_contents else None
+                                        elif 'source_url' in doc:
+                                            # For web content, show URL and any available content
+                                            content = f"Web content from: {doc.get('source_url', 'Unknown URL')}"
+                                            if 'content' in doc:
+                                                content += f"\n\n{doc['content']}"
+                                        
+                                        if content:
+                                            doc_content = content
+                                            break
+                            
+                            # Create unique key using message index and document index
+                            message_index = st.session_state.chat_history.index(message)
+                            unique_key = f"doc_content_msg_{message_index}_doc_{i}_{hash(doc_name) % 10000}"
                             
                             with st.expander(f"📄 {doc_name} (Relevance: {relevance_pct:.1f}%)", expanded=False):
                                 st.markdown(f"**Source:** {doc_name}")
                                 st.markdown(f"**Relevance:** {relevance_pct:.1f}%")
                                 
-                                # Show document metadata
-                                for doc in all_documents:
-                                    if doc.get('name') == doc_name:
-                                        if doc.get('file_type'):
-                                            st.markdown(f"**Type:** {doc.get('file_type')}")
-                                        if doc.get('extraction_method'):
-                                            method_map = {
-                                                'requests_github_raw': '🔄 GitHub Raw',
-                                                'requests_beautifulsoup': '🔄 BeautifulSoup',
-                                                'requests_plain_text': '🔄 Direct HTTP',
-                                                'mcp_just-every': '📦 Just-Every MCP'
-                                            }
-                                            method_display = method_map.get(doc.get('extraction_method'), doc.get('extraction_method'))
-                                            st.markdown(f"**Method:** {method_display}")
-                                        if doc.get('source_url'):
-                                            st.markdown(f"**URL:** {doc.get('source_url')}")
-                                        break
-                                
-                                st.markdown("---")
-                                # Use a unique counter-based key to avoid duplicates
-                                if 'doc_preview_counter' not in st.session_state:
-                                    st.session_state.doc_preview_counter = 0
-                                st.session_state.doc_preview_counter += 1
-                                unique_key = f"doc_preview_{st.session_state.doc_preview_counter}"
-                                st.text_area("Content", doc_content, height=200, key=unique_key)
+                                # Show document content
+                                if doc_content and doc_content != "Content not available":
+                                    st.markdown("**Content:**")
+                                    st.text_area("Document Content", value=doc_content, height=300, disabled=True, key=unique_key)
+                                else:
+                                    st.warning("⚠️ Content not available in session state or VectorIO database")
         
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -569,7 +817,7 @@ def process_user_query(query: str) -> None:
                 print("🔍 DEBUG: Finding relevant chunks...")
                 
                 # Find relevant chunks
-                relevant_chunks = find_relevant_chunks(query_embedding)
+                relevant_chunks = find_relevant_chunks(query)
                 
                 print(f"🔍 DEBUG: Found {len(relevant_chunks)} relevant chunks")
                 
@@ -655,15 +903,68 @@ def process_user_query(query: str) -> None:
         st.session_state.chat_history = st.session_state.chat_history[-50:]
 
 
-def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> List[Dict]:
-    """Find most relevant document chunks using improved retrieval with filtering and reranking"""
-    from .config import MAX_RELEVANT_CHUNKS, MIN_SIMILARITY_THRESHOLD, ENABLE_CHUNK_RERANKING
-    import streamlit as st  # Import at the top to avoid scope issues
+def find_relevant_chunks(query_text: str, top_k: int = None) -> List[Dict]:
+    """Find most relevant document chunks using LlamaStack VectorIO database"""
+    from .config import MAX_RELEVANT_CHUNKS
+    import streamlit as st
     
     if top_k is None:
         top_k = MAX_RELEVANT_CHUNKS
     
     relevant_chunks = []
+    
+    print(f"🔍 DEBUG: Starting RAG search for query: '{query_text}'")
+    print(f"🔍 DEBUG: Looking for top_k={top_k} chunks")
+    
+    # Try VectorIO first (preferred method)
+    try:
+        if 'llamastack_client' in st.session_state:
+            print(f"🔍 Using VectorIO to search for: {query_text}")
+            
+            # Use VectorIO to search the FAISS database with filtering for deleted documents
+            vectorio_results = st.session_state.llamastack_client.get_filtered_search_results(
+                query_text=query_text,
+                vector_db_id="faiss",
+                top_k=top_k
+            )
+            
+            print(f"🔍 DEBUG: VectorIO returned {len(vectorio_results) if vectorio_results else 0} raw results")
+            
+            if vectorio_results:
+                print(f"✅ VectorIO found {len(vectorio_results)} relevant chunks (filtered)")
+                
+                # Convert VectorIO results to our format
+                for i, result in enumerate(vectorio_results):
+                    chunk_data = {
+                        'content': result.get('content', ''),
+                        'document': result.get('metadata', {}).get('document_name', 'Unknown'),
+                        'similarity': result.get('similarity', 0.0),
+                        'chunk_index': result.get('metadata', {}).get('chunk_index', 0),
+                        'doc_name': result.get('metadata', {}).get('document_name', 'Unknown'),
+                        'doc_type': result.get('metadata', {}).get('file_type', 'FILE'),
+                        'source_url': result.get('metadata', {}).get('source_url', None)
+                    }
+                    relevant_chunks.append(chunk_data)
+                    
+                    # Debug: Show each retrieved chunk
+                    print(f"🔍 DEBUG: Chunk {i+1}:")
+                    print(f"   Document: {chunk_data['document']}")
+                    print(f"   Similarity: {chunk_data['similarity']:.4f}")
+                    print(f"   Content Preview: {chunk_data['content'][:200]}...")
+                    print(f"   Source URL: {chunk_data['source_url']}")
+                    print(f"   Doc Type: {chunk_data['doc_type']}")
+                    print()
+                
+                print(f"🔍 DEBUG: Returning {len(relevant_chunks)} relevant chunks from VectorIO")
+                return relevant_chunks
+            else:
+                print("⚠️ VectorIO returned no results, falling back to session state search")
+                
+    except Exception as e:
+        print(f"❌ VectorIO search failed: {e}, falling back to session state search")
+    
+    # Fallback to session state search (legacy method)
+    print("🔍 Using session state fallback search")
     
     # Search through both regular documents and uploaded documents (including web URLs)
     all_documents = []
@@ -680,15 +981,18 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
     
     print(f"🔍 DEBUG: Total documents to search: {len(all_documents)}")
     
-    # Enhanced similarity threshold based on query type
-    base_threshold = MIN_SIMILARITY_THRESHOLD
+    # Get query embedding for similarity search
+    query_embedding = None
+    try:
+        if 'llamastack_client' in st.session_state:
+            query_embedding = st.session_state.llamastack_client.get_embeddings(query_text)
+    except Exception as e:
+        print(f"❌ Failed to get query embedding: {e}")
+        return []
     
-    if 'current_query' in st.session_state:
-        query = st.session_state.current_query.lower()
-        # Increase threshold for specific technical queries to avoid irrelevant results
-        if any(tech_term in query for tech_term in ['python', 'javascript', 'java', 'c++', 'programming', 'code']):
-            base_threshold = max(base_threshold, 0.35)  # Higher threshold for technical queries
-            print(f"🔍 DEBUG: Using higher threshold ({base_threshold}) for technical query")
+    if not query_embedding:
+        print("❌ No query embedding available for similarity search")
+        return []
     
     for doc_idx, doc in enumerate(all_documents):
         print(f"🔍 DEBUG: Processing document {doc_idx + 1}/{len(all_documents)}: {doc.get('name', 'Unknown')} (type: {doc.get('file_type', 'FILE')})")
@@ -707,61 +1011,54 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
                 print(f"🔍 DEBUG: Chunk {i} similarity: {similarity:.4f}")
                 
                 # Filter out chunks below similarity threshold
-                if similarity >= base_threshold:
+                if similarity >= 0.3:  # Lower threshold for better recall
                     chunk_data = {
                         'content': doc['chunks'][i],
                         'document': doc['name'],
                         'similarity': similarity,
                         'chunk_index': i,
                         'doc_name': doc['name'],
-                        'doc_type': doc.get('file_type', 'FILE'),  # Add document type for debugging
-                        'source_url': doc.get('source_url', None)  # Add source URL for web content
+                        'doc_type': doc.get('file_type', 'FILE'),
+                        'source_url': doc.get('source_url', None)
                     }
                     relevant_chunks.append(chunk_data)
-                    print(f"✅ DEBUG: Added chunk {i} from {doc.get('name', 'Unknown')} (similarity: {similarity:.4f})")
+                    
+                    # Debug: Show each relevant chunk from session state
+                    print(f"🔍 DEBUG: Session State Chunk {len(relevant_chunks)}:")
+                    print(f"   Document: {chunk_data['document']}")
+                    print(f"   Similarity: {chunk_data['similarity']:.4f}")
+                    print(f"   Content Preview: {chunk_data['content'][:200]}...")
+                    print(f"   Source URL: {chunk_data['source_url']}")
+                    print()
                 else:
-                    print(f"❌ DEBUG: Chunk {i} below threshold ({similarity:.4f} < {base_threshold})")
+                    print(f"🔍 DEBUG: Chunk {i} below threshold ({similarity:.4f} < 0.3), skipping")
                     
             except Exception as e:
                 print(f"❌ DEBUG: Error calculating similarity for chunk {i} in {doc.get('name', 'Unknown')}: {e}")
                 continue
     
-    print(f"🔍 DEBUG: Found {len(relevant_chunks)} relevant chunks total")
-    
-    # Sort by similarity
     relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
+    final_chunks = relevant_chunks[:top_k]
     
-    # Enhanced reranking with better diversity
-    if ENABLE_CHUNK_RERANKING and len(relevant_chunks) > top_k:
-        reranked_chunks = []
-        used_docs = set()
-        
-        # First pass: get best chunk from each document (prioritize diversity)
-        for chunk in relevant_chunks:
-            if chunk['doc_name'] not in used_docs and len(reranked_chunks) < top_k:
-                reranked_chunks.append(chunk)
-                used_docs.add(chunk['doc_name'])
-        
-        # Second pass: fill remaining slots with highest similarity
-        for chunk in relevant_chunks:
-            if len(reranked_chunks) >= top_k:
-                break
-            if chunk not in reranked_chunks:
-                reranked_chunks.append(chunk)
-        
-        print(f"🔍 DEBUG: Reranked to {len(reranked_chunks)} chunks from {len(used_docs)} documents")
-        return reranked_chunks[:top_k]
+    print(f"🔍 DEBUG: Final result - {len(final_chunks)} chunks above threshold")
+    for i, chunk in enumerate(final_chunks):
+        print(f"🔍 DEBUG: Final Chunk {i+1}: {chunk['document']} (similarity: {chunk['similarity']:.4f})")
     
-    print(f"🔍 DEBUG: Returning top {min(top_k, len(relevant_chunks))} chunks")
-    return relevant_chunks[:top_k]
+    return final_chunks
 
 
 def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_model: str, embedding_model: str) -> str:
     """Generate response using relevant chunks with optimized prompting and context"""
+    print(f"🔍 DEBUG: generate_improved_response called with {len(relevant_chunks)} chunks")
+    print(f"🔍 DEBUG: Query: '{query}'")
+    
     if not relevant_chunks:
+        print("❌ DEBUG: No relevant chunks provided")
         return "I couldn't find relevant information in your documents to answer that question."
     
     from .config import MAX_CONTEXT_LENGTH, MIN_SIMILARITY_THRESHOLD
+    
+    print(f"🔍 DEBUG: MIN_SIMILARITY_THRESHOLD = {MIN_SIMILARITY_THRESHOLD}")
     
     # Filter chunks by improved similarity threshold and build focused context
     high_quality_chunks = [
@@ -769,25 +1066,35 @@ def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_mode
         if chunk['similarity'] >= MIN_SIMILARITY_THRESHOLD
     ]
     
+    print(f"🔍 DEBUG: {len(high_quality_chunks)} chunks above similarity threshold {MIN_SIMILARITY_THRESHOLD}")
+    
     if not high_quality_chunks:
+        print("❌ DEBUG: No chunks above similarity threshold")
         return f"I don't have relevant information about that in the provided documents."
     
     # Additional relevance check - ensure content actually relates to the query
     query_terms = query.lower().split()
+    print(f"🔍 DEBUG: Query terms: {query_terms}")
+    
     relevant_chunks = []
     
-    for chunk in high_quality_chunks:
+    for i, chunk in enumerate(high_quality_chunks):
         content_lower = chunk['content'].lower()
         # More strict relevance check - require multiple query terms to match
         matching_terms = sum(1 for term in query_terms if len(term) > 2 and term in content_lower)
         # Require at least 2 matching terms or high similarity (>0.7)
         if matching_terms >= 2 or chunk['similarity'] > 0.7:
             relevant_chunks.append(chunk)
-            print(f"✅ DEBUG: Chunk passed relevance check - {matching_terms} terms match, similarity: {chunk['similarity']:.3f}")
+            print(f"✅ DEBUG: Chunk {i+1} passed relevance check - {matching_terms} terms match, similarity: {chunk['similarity']:.3f}")
+            print(f"   Document: {chunk['document']}")
+            print(f"   Content Preview: {chunk['content'][:200]}...")
         else:
-            print(f"❌ DEBUG: Chunk failed relevance check - {matching_terms} terms match, similarity: {chunk['similarity']:.3f}")
+            print(f"❌ DEBUG: Chunk {i+1} failed relevance check - {matching_terms} terms match, similarity: {chunk['similarity']:.3f}")
+            print(f"   Document: {chunk['document']}")
+            print(f"   Content Preview: {chunk['content'][:200]}...")
     
     if not relevant_chunks:
+        print("❌ DEBUG: No chunks passed relevance check")
         return f"I don't have relevant information about '{query}' in the provided documents. Please try rephrasing your question or upload relevant documents."
     
     # Sort by similarity and take only the most relevant chunks
@@ -796,12 +1103,18 @@ def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_mode
 
     context = "\n\n".join([chunk['content'] for chunk in relevant_chunks])
     
+    print(f"🔍 DEBUG: Final context being sent to LLM:")
+    print(f"   Length: {len(context)} characters")
+    print(f"   Context Preview: {context[:500]}...")
+    print(f"   Number of chunks: {len(relevant_chunks)}")
+    
     # Add a debug log to show the final retrieved context
     logger.info(f"Retrieved context for query '{query}':\n{context}")
 
     # Ensure context does not exceed max length
     if len(context) > MAX_CONTEXT_LENGTH:
         context = context[:MAX_CONTEXT_LENGTH]
+        print(f"🔍 DEBUG: Context truncated to {MAX_CONTEXT_LENGTH} characters")
     
     # Optimized system prompt for concise responses
     system_prompt = f"""You are a helpful AI assistant. Your task is to answer a question based on the provided context.
@@ -825,6 +1138,9 @@ DOCUMENT CONTEXT:
 QUESTION: {query}
 
 ANSWER:"""
+    
+    print(f"🔍 DEBUG: Sending to LLM model: {llm_model}")
+    print(f"🔍 DEBUG: User prompt length: {len(user_prompt)} characters")
     
     # Try LlamaStack with optimized parameters, with a fallback to Ollama
     response = ""

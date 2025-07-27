@@ -13,8 +13,8 @@ SUPPORTED_FILE_TYPES = ['pdf', 'txt', 'md', 'docx', 'pptx']
 
 # Model Configuration
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-DEFAULT_LLM_MODEL = "llama3.2:1b"
-DEFAULT_OLLAMA_MODELS = ["llama3.2:1b"]  # Remove nomic-embed-text since we're using sentence-transformers
+DEFAULT_LLM_MODEL = "llama3.2:3b"
+DEFAULT_OLLAMA_MODELS = ["llama3.2:3b"]  # Remove nomic-embed-text since we're using sentence-transformers
 
 # Processing Configuration
 CHARS_PER_FILE_MULTIPLIER = 2.5  # Estimated characters per byte
