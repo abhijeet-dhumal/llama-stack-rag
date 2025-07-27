@@ -11,46 +11,21 @@ from typing import Dict, List, Optional, Any
 
 def render_model_dashboard() -> None:
     """Display model selection and provider dashboard"""
-    # Header with aligned refresh button
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.header("🤖 Model Dashboard")
-    with col2:
-        st.markdown("")  # Add space for alignment
-        if st.button("🔄 Refresh", help="Refresh available models", type="secondary"):
-            st.session_state.available_models = get_all_available_models()
-            st.rerun()
-    
+
     # Load models if not already loaded
     if not st.session_state.available_models["all"]:
         with st.spinner("Loading available models..."):
             st.session_state.available_models = get_all_available_models()
-    
-    # Current model status
-    with st.expander("📊 Current Models", expanded=True):
-        # Determine model status  
-        embedding_status = "🧠 LlamaStack (sentence-transformers)"  # Fixed embedding model
-        if st.session_state.selected_llm_model in ["llama3.2:1b", "llama3.2:3b"]:
-            llm_status = "🏠 Local (Ollama)"
-        else:
-            llm_status = "🧪 Demo"  # Fallback for unknown models
-        
-        st.markdown(f"""
-        **🔤 Embedding**: `all-MiniLM-L6-v2` {embedding_status}  
-        **🧠 LLM**: `{st.session_state.selected_llm_model}` {llm_status}
-        """)
-        
-        if llm_status == "🧪 Demo":
-            st.info("💡 Install Ollama models below for real AI responses!")
-    
+
     # Model Selection
-    st.subheader("🎛️ Model Selection")
-    
+    st.subheader("🎛️ Model Dashboard")
+
     # Fixed embedding model info (no dropdown)
     st.markdown("**🔤 Embedding Model (Fixed)**")
     st.info("📌 Using `all-MiniLM-L6-v2` via LlamaStack sentence-transformers for consistent, high-quality embeddings")
-    
+
     # LLM model selection (keep this dropdown)
+    st.markdown("**🔤 LLM Model (Select)**")
     llm_models = st.session_state.available_models["llm"]
     if llm_models:
         # Remove duplicates while preserving order
@@ -61,21 +36,46 @@ def render_model_dashboard() -> None:
             if model_id not in seen:
                 seen.add(model_id)
                 unique_llm_models.append(model_id)
-        
+
         selected_llm = st.selectbox(
             "🧠 LLM Model",
             options=unique_llm_models,
-            index=0 if st.session_state.selected_llm_model not in unique_llm_models 
+            index=0 if st.session_state.selected_llm_model not in unique_llm_models
                   else unique_llm_models.index(st.session_state.selected_llm_model),
             help="Model used for generating responses and chat",
             key="llm_model_selector"
         )
-        
+
         if selected_llm != st.session_state.selected_llm_model:
             st.session_state.selected_llm_model = selected_llm
             st.rerun()
     else:
         st.warning("⚠️ No LLM models available")
+
+    # Current model status
+    with st.expander("📊 Current Models", expanded=True):
+        # Determine model status
+        embedding_status = "🧠 LlamaStack (sentence-transformers)"  # Fixed embedding model
+        if st.session_state.selected_llm_model in ["llama3.2:1b", "llama3.2:3b"]:
+            llm_status = "🏠 Local (Ollama)"
+        else:
+            llm_status = "🧪 Demo"  # Fallback for unknown models
+
+        st.markdown(f"""
+        **🔤 Embedding**: `all-MiniLM-L6-v2` {embedding_status}
+        **🧠 LLM**: `{st.session_state.selected_llm_model}` {llm_status}
+        """)
+
+        if llm_status == "🧪 Demo":
+            st.info("💡 Install Ollama models below for real AI responses!")
+
+    # Show debug info in expander
+    with st.expander("🔍 Model Detection Debug", expanded=False):
+        debug_info = st.session_state.available_models.get("debug_info", [])
+        model_counts = st.session_state.available_models.get("model_counts", {})
+        for info in debug_info:
+            st.text(info)
+        st.json(model_counts)
 
 
 def render_ollama_integration() -> None:
@@ -248,7 +248,7 @@ def remove_ollama_model(model_name: str) -> None:
         st.error(f"❌ Error removing model: {str(e)}")
 
 
-def get_all_available_models() -> Dict[str, List[Any]]:
+def get_all_available_models() -> Dict[str, Any]:
     """Get models from Ollama only - embedding model is fixed to all-MiniLM-L6-v2"""
     embedding_models = []
     llm_models = []
@@ -298,20 +298,18 @@ def get_all_available_models() -> Dict[str, List[Any]]:
         all_models.append(default_llm)
         debug_info.append("Added default LLM model")
     
-    # Show debug info in expander
-    with st.expander("🔍 Model Detection Debug", expanded=False):
-        for info in debug_info:
-            st.text(info)
-        st.json({
-            "total_models": len(all_models),
-            "embedding_models": len(embedding_models), 
-            "llm_models": len(llm_models)
-        })
+    model_counts = {
+        "total_models": len(all_models),
+        "embedding_models": len(embedding_models),
+        "llm_models": len(llm_models)
+    }
     
     return {
         "embedding": embedding_models,
         "llm": llm_models,
-        "all": all_models
+        "all": all_models,
+        "debug_info": debug_info,
+        "model_counts": model_counts,
     }
 
 

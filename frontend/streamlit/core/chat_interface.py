@@ -6,8 +6,13 @@ Handles chat functionality, welcome screen, and user interactions
 import streamlit as st
 import streamlit.components.v1 as components
 import html
+import re
 from typing import List, Dict, Any
 from .utils import cosine_similarity, get_context_type
+import logging
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def render_welcome_screen() -> None:
@@ -17,78 +22,76 @@ def render_welcome_screen() -> None:
     st.markdown("<br>" * 2, unsafe_allow_html=True)
     
     # Main welcome message
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
+    st.markdown("""
+    <div style="text-align: center;">
+        <h2>Welcome to your intelligent knowledge assistant</h2>
+        <p style="font-size: 1.1em; margin: 1.5rem 0;">
+            Upload documents or process web URLs to get started. I'll help you find information, 
+            answer questions, and explore your knowledge base from multiple sources.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Enhanced getting started card with web content highlight
+    st.success("""
+    **🎯 Get Started - Choose Your Source**
+    
+    **📄 Upload Files** using the sidebar →  
+    *Supported formats: TXT, PDF, MD, DOCX, PPTX (Max 50MB)*
+    
+    **🌐 Process Web URLs** ✨ →
+    *Extract content from articles, docs, Wikipedia in real-time*
+    """)
+    
+    # Features overview with updated capabilities
+    st.markdown("### ✨ What you can do:")
+    
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
         st.markdown("""
-        <div style="text-align: center;">
-            <h2>Welcome to your intelligent knowledge assistant</h2>
-            <p style="font-size: 1.1em; margin: 1.5rem 0;">
-                Upload documents or process web URLs to get started. I'll help you find information, 
-                answer questions, and explore your knowledge base from multiple sources.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        **📝 Ask Questions**
         
-        # Enhanced getting started card with web content highlight
-        st.success("""
-        **🎯 Get Started - Choose Your Source**
-        
-        **📄 Upload Files** using the sidebar →  
-        *Supported formats: TXT, PDF, MD, DOCX, PPTX (Max 50MB)*
-        
-        **🌐 Process Web URLs** ✨ **NEW!**  
-        *Extract content from articles, docs, Wikipedia in real-time*
+        Query your documents and web content with natural language
         """)
+    
+    with col_b:
+        st.markdown("""
+        **🔍 Hybrid Search**
         
-        # Features overview with updated capabilities
-        st.markdown("### ✨ What you can do:")
+        Find information across files and web sources
+        """)
+    
+    with col_c:
+        st.markdown("""
+        **💡 Real-time Processing**
         
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            st.markdown("""
-            **📝 Ask Questions**
-            
-            Query your documents and web content with natural language
-            """)
+        Instant embedding and analysis of web content
+        """)
+    
+    # New feature spotlight
+    st.markdown("---")
+    st.markdown("### 🌟 Feature Spotlight")
+    
+    col_left, col_right = st.columns(2)
+    with col_left:
+        st.info("""
+        **🌐 Web Content Processing**
         
-        with col_b:
-            st.markdown("""
-            **🔍 Hybrid Search**
-            
-            Find information across files and web sources
-            """)
+        - Uses MCP Server with Mozilla Readability
+        - Clean extraction from articles and documentation  
+        - Smart fallback for maximum compatibility
+        - Mixed with uploaded files in unified knowledge base
+        """)
+    
+    with col_right:
+        st.info("""
+        **🚀 Enhanced AI Pipeline**
         
-        with col_c:
-            st.markdown("""
-            **💡 Real-time Processing**
-            
-            Instant embedding and analysis of web content
-            """)
-        
-        # New feature spotlight
-        st.markdown("---")
-        st.markdown("### 🌟 New Feature Spotlight")
-        
-        col_left, col_right = st.columns(2)
-        with col_left:
-            st.info("""
-            **🌐 Web Content Processing**
-            
-            - Uses MCP Server with Mozilla Readability
-            - Clean extraction from articles and documentation  
-            - Smart fallback for maximum compatibility
-            - Mixed with uploaded files in unified knowledge base
-            """)
-        
-        with col_right:
-            st.info("""
-            **🚀 Enhanced AI Pipeline**
-            
-            - LlamaStack orchestration for unified processing
-            - Sentence Transformers for high-quality embeddings
-            - Local Ollama models for privacy
-            - Real-time performance analytics
-            """)
+        - LlamaStack orchestration for unified processing
+        - Sentence Transformers for high-quality embeddings
+        - Local Ollama models for privacy
+        - Real-time performance analytics
+        """)
     
     st.markdown("<br>" * 2, unsafe_allow_html=True)
 
@@ -753,47 +756,6 @@ def find_relevant_chunks(query_embedding: List[float], top_k: int = None) -> Lis
     return relevant_chunks[:top_k]
 
 
-def validate_response(response: str, query: str, context: str) -> bool:
-    """Validate if the response is relevant and not hallucinated"""
-    response_lower = response.lower()
-    query_lower = query.lower()
-    context_lower = context.lower()
-    
-    # Check for common hallucination patterns
-    hallucination_indicators = [
-        'red hat', 'openshift', 'nvidia', 'enterprise',
-        'based on the documents', 'according to the documents',
-        'the documents show', 'as mentioned in the documents'
-    ]
-    
-    # Check if response contains hallucination indicators
-    for indicator in hallucination_indicators:
-        if indicator in response_lower:
-            print(f"⚠️ DEBUG: Potential hallucination detected - '{indicator}' in response")
-            return False
-    
-    # Check if response is too generic
-    generic_phrases = [
-        'is a method for', 'is a technique for', 'is a process for',
-        'allows you to', 'enables you to', 'provides a way to'
-    ]
-    
-    generic_count = sum(1 for phrase in generic_phrases if phrase in response_lower)
-    if generic_count >= 2:
-        print(f"⚠️ DEBUG: Response seems too generic - {generic_count} generic phrases detected")
-        return False
-    
-    # Check if response actually addresses the query
-    query_terms = [term for term in query_lower.split() if len(term) > 2]
-    matching_terms = sum(1 for term in query_terms if term in response_lower)
-    
-    if matching_terms < len(query_terms) * 0.5:  # At least 50% of query terms should appear
-        print(f"⚠️ DEBUG: Response doesn't address query well - only {matching_terms}/{len(query_terms)} terms match")
-        return False
-    
-    return True
-
-
 def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_model: str, embedding_model: str) -> str:
     """Generate response using relevant chunks with optimized prompting and context"""
     if not relevant_chunks:
@@ -830,108 +792,88 @@ def generate_improved_response(query: str, relevant_chunks: List[Dict], llm_mode
     
     # Sort by similarity and take only the most relevant chunks
     relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
-    relevant_chunks = relevant_chunks[:2]  # Only top 2 most relevant chunks
+    relevant_chunks = relevant_chunks[:2]  # Using a smaller number of chunks for more focused context
+
+    context = "\n\n".join([chunk['content'] for chunk in relevant_chunks])
     
-    # Build optimized context with quality scoring
-    context_parts = []
-    total_context_length = 0
-    
-    for i, chunk in enumerate(relevant_chunks):
-        doc_name = chunk['document']
-        content = chunk['content']
-        similarity = chunk['similarity']
-        
-        # Truncate chunk if too long, but preserve sentence boundaries
-        max_chunk_length = min(800, (MAX_CONTEXT_LENGTH - total_context_length) // max(1, (2 - i)))
-        
-        if len(content) > max_chunk_length:
-            # Find last sentence boundary within limit
-            truncated = content[:max_chunk_length]
-            last_sentence = max(
-                truncated.rfind('. '),
-                truncated.rfind('! '),
-                truncated.rfind('? ')
-            )
-            if last_sentence > max_chunk_length * 0.7:  # At least 70% of content
-                content = truncated[:last_sentence + 1]
-            else:
-                content = truncated + "..."
-        
-        context_part = f"Source: {doc_name} (Relevance: {similarity:.2f})\n{content}"
-        context_parts.append(context_part)
-        total_context_length += len(context_part)
-        
-        if total_context_length >= MAX_CONTEXT_LENGTH:
-            break
-    
-    context = "\n\n---\n\n".join(context_parts)
-    
-    # Debug: Log what context we're using
-    print(f"🔍 DEBUG: Using {len(context_parts)} context parts for query: '{query}'")
-    for i, part in enumerate(context_parts):
-        print(f"🔍 DEBUG: Context {i+1}: {part[:100]}...")
+    # Add a debug log to show the final retrieved context
+    logger.info(f"Retrieved context for query '{query}':\n{context}")
+
+    # Ensure context does not exceed max length
+    if len(context) > MAX_CONTEXT_LENGTH:
+        context = context[:MAX_CONTEXT_LENGTH]
     
     # Optimized system prompt for concise responses
-    system_prompt = f"""You are a helpful AI assistant. Answer questions based ONLY on the provided document context.
+    system_prompt = f"""You are a helpful AI assistant. Your task is to answer a question based on the provided context.
 
-CRITICAL RULES:
-- Give a direct, concise answer (1-3 sentences maximum) unless explictly asked.
-- Do NOT repeat the question
-- Do NOT say "Based on the documents" or similar phrases
-- Do NOT provide generic information not in the context
-- If context is irrelevant to the question, say "I don't have relevant information about that in the provided documents"
-- Focus on the specific question asked
-- Be brief and to the point
-- If you cannot answer from the context, say so clearly
+Follow these rules precisely:
+1.  **Be Concise:** Provide a direct and concise answer. Avoid unnecessary details unless the user asks for a detailed explanation.
+2.  **Stay on Topic:** Only use information from the provided 'DOCUMENT CONTEXT'.
+3.  **No Echoing:** Do not repeat the question or the context in your answer.
+4.  **No Prefaces:** Do not start your answer with phrases like "Based on the document..." or "The context says...".
+5.  **Handle Irrelevance:** If the context does not contain the answer, simply state: "I don't have relevant information about that in the provided documents."
 
-Available context: {len(context_parts)} relevant document excerpts"""
+The user will provide the context and the question. You must provide only the answer."""
 
-    user_prompt = f"""DOCUMENT CONTEXT:
+    user_prompt = f"""Based on the following context, answer the question.
+
+DOCUMENT CONTEXT:
+---
 {context}
+---
 
 QUESTION: {query}
 
 ANSWER:"""
     
-    # Try LlamaStack with optimized parameters
+    # Try LlamaStack with optimized parameters, with a fallback to Ollama
+    response = ""
     try:
         response = st.session_state.llamastack_client.chat_completion(
             user_prompt,
             system_prompt=system_prompt,
             model=llm_model
         )
-        
-        if response and len(response.strip()) > 20:  # Ensure meaningful response
-            response = response.strip()
-            # Validate response to prevent hallucination
-            if validate_response(response, query, context):
-                print(f"✅ DEBUG: Response validation passed")
-                return response
-            else:
-                print(f"⚠️ DEBUG: Response validation failed, trying fallback")
     except Exception as e:
         print(f"LlamaStack completion failed: {e}")
-    
-    # Try Ollama fallback with improved prompting
-    try:
-        ollama_response = try_ollama_completion_optimized(query, context, llm_model)
-        if ollama_response and len(ollama_response.strip()) > 20:
-            ollama_response = ollama_response.strip()
-            # Validate response to prevent hallucination
-            if validate_response(ollama_response, query, context):
-                print(f"✅ DEBUG: Ollama response validation passed")
-                return ollama_response
-            else:
-                print(f"⚠️ DEBUG: Ollama response validation failed, using fallback")
-    except Exception as e:
-        print(f"Ollama completion failed: {e}")
-    
-    # Final fallback - enhanced content-based response
-    fallback_response = generate_enhanced_content_response(query, relevant_chunks)
-    if validate_response(fallback_response, query, context):
-        return fallback_response
-    else:
-        return f"I don't have relevant information about '{query}' in the provided documents. Please try rephrasing your question or upload relevant documents."
+        # Try Ollama as a fallback if LlamaStack fails completely
+        try:
+            response = try_ollama_completion_optimized(query, context, llm_model)
+        except Exception as e2:
+            print(f"Ollama fallback failed: {e2}")
+
+    # If we got a response from either, clean and return it
+    if response and response.strip():
+        response = response.strip()
+
+        # Prioritize the text before any conversational turn marker like 'User:' or 'Question:'
+        primary_answer = response
+        next_turn_markers = [r'user:', r'question:']
+        for marker in next_turn_markers:
+            match = re.search(marker, primary_answer, flags=re.IGNORECASE)
+            if match:
+                primary_answer = primary_answer[:match.start()].strip()
+        
+        # Now, clean up prefixes like 'Assistant:' or 'Answer:' from the extracted primary answer
+        primary_answer_lower = primary_answer.lower()
+        match = re.search(r'(assistant|answer):', primary_answer_lower)
+        if match:
+            primary_answer = primary_answer[match.end():].strip()
+
+        response = primary_answer
+
+        # Replace any remaining markers with emojis for display
+        response = re.sub(r"user:", "👤", response, flags=re.IGNORECASE)
+        response = re.sub(r"question:", "❓", response, flags=re.IGNORECASE)
+        response = re.sub(r"assistant:", "🤖", response, flags=re.IGNORECASE)
+        response = re.sub(r"answer:", "💡", response, flags=re.IGNORECASE)
+
+        if len(response.strip()) > 0:
+            return response.strip()
+
+    # If all attempts failed or returned empty, generate content-based response
+    print(f"⚠️ DEBUG: All LLM attempts failed or returned empty. Using content-based fallback.")
+    return generate_enhanced_content_response(query, relevant_chunks)
 
 
 def try_ollama_completion(query: str, context: str, model: str) -> str:
@@ -1001,19 +943,17 @@ def try_ollama_completion_optimized(query: str, context: str, model: str) -> str
         from .config import LLM_TEMPERATURE, LLM_MAX_TOKENS
         
         # Focused prompt for Ollama - no repetition
-        prompt = f"""Answer this question based ONLY on the provided document context.
-
-DOCUMENT CONTEXT:
-{context[:3000]}  # Limit context for Ollama
-
-QUESTION: {query}
-
-INSTRUCTIONS: Provide a direct, concise answer. Do NOT repeat the question or context. Cite document names when making claims.
-
-ANSWER:"""
+        prompt = (
+            f"System: You are an AI assistant for RAG LlamaStack. Answer the user's question based *only* on the provided context. "
+            f"If the context doesn't directly answer the question, but has related information, summarize what you can from the context. "
+            f"If the context is completely irrelevant, then say you can't answer. Be concise.\n\n"
+            f"Context: {context}\n\n"
+            f"User: {query}\n\n"
+            f"Assistant:"
+        )
         
-        # Use Ollama with optimized parameters
-        cmd = [
+        # Using subprocess to call ollama directly for potentially better performance
+        command = [
             "ollama", "generate", model,
             "--temperature", str(LLM_TEMPERATURE),
             "--num-predict", str(min(LLM_MAX_TOKENS, 800)),  # Ollama limit
@@ -1021,7 +961,7 @@ ANSWER:"""
         ]
         
         result = subprocess.run(
-            cmd,
+            command,
             capture_output=True,
             text=True,
             timeout=45
@@ -1029,10 +969,30 @@ ANSWER:"""
         
         if result.returncode == 0 and result.stdout.strip():
             response = result.stdout.strip()
-            # Clean up any prompt echoing
-            if "ANSWER:" in response:
-                response = response.split("ANSWER:")[-1].strip()
-            if len(response) > 30:
+            
+            # Prioritize the text before any conversational turn marker like 'User:' or 'Question:'
+            primary_answer = response
+            next_turn_markers = [r'user:', r'question:']
+            for marker in next_turn_markers:
+                match = re.search(marker, primary_answer, flags=re.IGNORECASE)
+                if match:
+                    primary_answer = primary_answer[:match.start()].strip()
+            
+            # Now, clean up prefixes like 'Assistant:' or 'Answer:' from the extracted primary answer
+            primary_answer_lower = primary_answer.lower()
+            match = re.search(r'(assistant|answer):', primary_answer_lower)
+            if match:
+                primary_answer = primary_answer[match.end():].strip()
+
+            response = primary_answer
+
+            # Replace any remaining markers with emojis for display
+            response = re.sub(r"user:", "👤", response, flags=re.IGNORECASE)
+            response = re.sub(r"question:", "❓", response, flags=re.IGNORECASE)
+            response = re.sub(r"assistant:", "🤖", response, flags=re.IGNORECASE)
+            response = re.sub(r"answer:", "💡", response, flags=re.IGNORECASE)
+
+            if len(response) > 20:
                 return response
         
     except subprocess.TimeoutExpired:

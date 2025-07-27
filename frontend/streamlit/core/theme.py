@@ -113,6 +113,16 @@ def render_header_theme_toggle() -> None:
     st.markdown('</div>', unsafe_allow_html=True)
 
 
+def render_sidebar_theme_toggle():
+    """Renders a theme toggle button, suitable for the sidebar."""
+    theme_icon = "☀️" if st.session_state.dark_theme else "🌙"
+    theme_tooltip = "Switch to Light Theme" if st.session_state.dark_theme else "Switch to Dark Theme"
+
+    if st.button(theme_icon, key="sidebar_theme_toggle", help=theme_tooltip):
+        st.session_state.dark_theme = not st.session_state.dark_theme
+        st.rerun()
+
+
 def toggle_theme():
     """Toggle between dark and light themes"""
     st.session_state.dark_theme = not st.session_state.dark_theme

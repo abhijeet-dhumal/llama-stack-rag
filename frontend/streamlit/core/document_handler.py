@@ -415,7 +415,7 @@ def render_file_uploader() -> List:
     
     input_method = st.radio(
         "Choose input method:",
-        ["📄 Upload Files", "🚀 Bulk URLs"],
+        ["📄 Upload Files", "🌐 Process Web URLs", "📂 Upload URLs File"],
         key="input_method_radio",
         horizontal=True
     )
@@ -446,12 +446,12 @@ def render_file_uploader() -> List:
             - 📊 PowerPoint (.pptx)
             """)
     
-    elif input_method == "🚀 Bulk URLs":
-        st.info("🚀 Process multiple URLs at once for efficient bulk content extraction")
-        st.info("Supports single URLs, multiple URLs, and file uploads (.txt, .csv)")
-        
+    elif input_method == "🌐 Process Web URLs":
         # Call the bulk URL processing interface
-        render_bulk_url_input()
+        render_url_paste_input()
+
+    elif input_method == "📂 Upload URLs File":
+        render_url_file_upload_input()
     
     return uploaded_files if uploaded_files else []
 
@@ -773,9 +773,8 @@ def process_bulk_web_urls(urls: List[str], progress_callback=None):
         status_text.empty()
 
 
-def render_bulk_url_input():
-    """Render the bulk URL input interface"""
-    st.markdown("### 🌐 Web Content Extraction")
+def render_url_paste_input():
+    """Render the URL paste input interface"""
     st.markdown("Process web URLs to extract content. Enter one URL per line (or just one URL for single processing):")
     
     # Text area for bulk URLs
@@ -786,9 +785,47 @@ def render_bulk_url_input():
         help="Enter one or multiple URLs, one per line. URLs should start with http:// or https://",
         key="bulk_urls_text"
     )
-    
+
+    # Process manually entered URLs
+    if urls_text:
+        urls = [url.strip() for url in urls_text.split('\n') if url.strip()]
+        
+        if urls:
+            st.markdown(f"**Found {len(urls)} URLs to process:**")
+            for url in urls[:5]:  # Show first 5
+                st.code(url)
+            if len(urls) > 5:
+                st.caption(f"... and {len(urls) - 5} more URLs")
+            
+            if st.button("🚀 Process URLs", type="primary"):
+                process_bulk_web_urls(urls)
+        else:
+            st.warning("⚠️ No valid URLs found in the text area")
+    else:
+        st.info("💡 Enter URLs in the text area above to process them.")
+
+    # Show processing tips
+    with st.expander("💡 Processing Tips"):
+        st.markdown("""
+        **Best Practices for URL Processing:**
+        
+        - **Single URL**: Just enter one URL for individual processing
+        - **Multiple URLs**: Enter multiple URLs, one per line
+        - **URL Format**: Ensure URLs start with `http://` or `https://`
+        - **Rate Limiting**: Some websites may limit requests
+        - **Content Quality**: Not all websites provide extractable content
+        
+        **GitHub URL Examples:**
+        - ✅ `https://github.com/kubeflow/trainer/blob/master/README.md`
+        - ✅ `https://github.com/username/repo-name` (auto-finds README.md)
+        - ✅ `https://github.com/username/repo/blob/main/docs/guide.md`
+        """)
+
+def render_url_file_upload_input():
+    """Render the URL file upload interface"""
+    st.markdown("Upload a text or CSV file containing a list of URLs to process.")
+
     # File upload option for bulk URLs
-    st.markdown("**Or upload a text file with URLs:**")
     uploaded_file = st.file_uploader(
         "Upload URL list file",
         type=['txt', 'csv'],
@@ -819,13 +856,9 @@ def render_bulk_url_input():
                 if len(urls_from_file) > 10:
                     st.caption(f"... and {len(urls_from_file) - 10} more URLs")
                 
-                # Combine with manually entered URLs
-                manual_urls = [url.strip() for url in urls_text.split('\n') if url.strip()] if urls_text else []
-                all_urls = manual_urls + urls_from_file
-                
                 if st.button("🚀 Process All URLs", type="primary"):
-                    if all_urls:
-                        process_bulk_web_urls(all_urls)
+                    if urls_from_file:
+                        process_bulk_web_urls(urls_from_file)
                     else:
                         st.warning("⚠️ No URLs to process")
             else:
@@ -833,42 +866,10 @@ def render_bulk_url_input():
         
         except Exception as e:
             st.error(f"❌ Error reading file: {str(e)}")
-    
-    else:
-        # Process manually entered URLs
-        if urls_text:
-            urls = [url.strip() for url in urls_text.split('\n') if url.strip()]
-            
-            if urls:
-                st.markdown(f"**Found {len(urls)} URLs to process:**")
-                for url in urls[:5]:  # Show first 5
-                    st.code(url)
-                if len(urls) > 5:
-                    st.caption(f"... and {len(urls) - 5} more URLs")
-                
-                if st.button("🚀 Process URLs", type="primary"):
-                    process_bulk_web_urls(urls)
-            else:
-                st.warning("⚠️ No valid URLs found in the text area")
-        else:
-            st.info("💡 Enter URLs in the text area above or upload a file with URLs")
-    
+
     # Show processing tips
-    with st.expander("💡 Processing Tips"):
+    with st.expander("💡 File Format Tips"):
         st.markdown("""
-        **Best Practices for URL Processing:**
-        
-        - **Single URL**: Just enter one URL for individual processing
-        - **Multiple URLs**: Enter multiple URLs, one per line
-        - **URL Format**: Ensure URLs start with `http://` or `https://`
-        - **Rate Limiting**: Some websites may limit requests
-        - **Content Quality**: Not all websites provide extractable content
-        
-        **GitHub URL Examples:**
-        - ✅ `https://github.com/kubeflow/trainer/blob/master/README.md`
-        - ✅ `https://github.com/username/repo-name` (auto-finds README.md)
-        - ✅ `https://github.com/username/repo/blob/main/docs/guide.md`
-        
         **Supported File Formats:**
         - **Text files (.txt)**: One URL per line
         - **CSV files (.csv)**: URLs in the first column

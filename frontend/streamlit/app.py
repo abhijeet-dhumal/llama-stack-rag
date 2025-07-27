@@ -7,7 +7,7 @@ import streamlit as st
 
 # Import core modules
 from core.config import PAGE_CONFIG, LLAMASTACK_BASE, APP_DESCRIPTION
-from core.theme import initialize_theme, apply_theme, render_header_theme_toggle
+from core.theme import initialize_theme, apply_theme, render_header_theme_toggle, render_sidebar_theme_toggle
 from core.utils import (
     initialize_session_state, validate_llamastack_connection,
     cleanup_interrupted_uploads, process_uploaded_files_with_state_tracking
@@ -227,23 +227,6 @@ def load_bootstrap_css():
             color: #ffffff !important;
         }
         
-        /* Force white text for light theme buttons with higher specificity */
-        body:not([data-theme="dark"]) .stButton > button {
-            color: #ffffff !important;
-        }
-        
-        html body:not([data-theme="dark"]) .stButton > button {
-            color: #ffffff !important;
-        }
-        
-        /* Maximum specificity for light theme button text */
-        html body:not([data-theme="dark"]) .stButton > button,
-        html body:not([data-theme="dark"]) .stButton > button span,
-        html body:not([data-theme="dark"]) .stButton > button div,
-        html body:not([data-theme="dark"]) .stButton > button p {
-            color: #ffffff !important;
-        }
-        
         /* Form submit button styling - Theme-aware */
         .stFormSubmitButton > button {
             border-radius: 0.375rem !important;
@@ -297,6 +280,10 @@ def load_bootstrap_css():
         html body:not([data-theme="dark"]) .stFormSubmitButton > button p {
             color: #ffffff !important;
         }
+
+        [data-theme="light"] .stButton button[kind="primary"] {
+            color: white !important;
+        }
         
         /* Secondary button styling */
         .stButton > button[kind="secondary"] {
@@ -311,10 +298,12 @@ def load_bootstrap_css():
         }
         
         /* Label styling - Dark theme */
-        .stMarkdown, .stText, .stLabel {
+        [data-theme="dark"] .stMarkdown, 
+        [data-theme="dark"] .stText, 
+        [data-theme="dark"] .stLabel {
             color: #ffffff !important;
         }
-        
+
         /* Form text styling */
         .form-text, .text-muted {
             color: #aaaaaa !important;
@@ -373,9 +362,17 @@ def load_bootstrap_css():
             color: #000000 !important;
         }
         
-        /* Light theme selectbox background */
-        [data-theme="light"] .stSelectbox [data-baseweb="select"] > div {
+        [data-theme="light"] .stSelectbox > div > div > div {
             background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        
+        [data-theme="light"] .stSelectbox [data-testid="stSelectbox"] {
+            color: #000000 !important;
+        }
+
+        /* This will target the selected value in the selectbox specifically */
+        [data-theme="light"] .stSelectbox [data-baseweb="select"] > div > div {
             color: #000000 !important;
         }
         
@@ -447,65 +444,65 @@ def load_bootstrap_css():
         }
         
         /* Streamlit alert compatibility - Dark theme */
-        .stAlert {
+        [data-theme="dark"] .stAlert {
             background-color: #0d1117 !important;
             border-color: #0d6efd !important;
             color: #ffffff !important;
         }
         
-        .stAlert[data-baseweb="notification"] {
+        [data-theme="dark"] .stAlert[data-baseweb="notification"] {
             background-color: #0d1117 !important;
             border-color: #ffc107 !important;
             color: #ffffff !important;
         }
         
         /* Success box styling - Dark theme */
-        .stSuccess {
+        [data-theme="dark"] .stSuccess {
             background-color: #0d1117 !important;
             border-color: #198754 !important;
             color: #ffffff !important;
         }
         
         /* Error box styling - Dark theme */
-        .stError {
+        [data-theme="dark"] .stError {
             background-color: #0d1117 !important;
             border-color: #dc3545 !important;
             color: #ffffff !important;
         }
         
         /* Warning box styling - Dark theme */
-        .stWarning {
+        [data-theme="dark"] .stWarning {
             background-color: #0d1117 !important;
             border-color: #ffc107 !important;
             color: #ffffff !important;
         }
         
         /* Sidebar visibility and styling */
-        section[data-testid="stSidebar"] {
+        [data-theme="dark"] section[data-testid="stSidebar"] {
             background-color: #2b2b2b !important;
             color: #ffffff !important;
         }
         
-        section[data-testid="stSidebar"] .css-1d391kg {
+        [data-theme="dark"] section[data-testid="stSidebar"] .css-1d391kg {
             background-color: transparent !important;
         }
         
         /* Ensure all sidebar content is visible */
-        section[data-testid="stSidebar"] * {
+        [data-theme="dark"] section[data-testid="stSidebar"] * {
             color: #ffffff !important;
         }
         
         /* Simple text color fixes for dark theme */
-        .text-muted {
+        [data-theme="dark"] .text-muted {
             color: #aaaaaa !important;
         }
         
         /* Fix sidebar text color */
-        section[data-testid="stSidebar"] h1,
-        section[data-testid="stSidebar"] h2,
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] label {
+        [data-theme="dark"] section[data-testid="stSidebar"] h1,
+        [data-theme="dark"] section[data-testid="stSidebar"] h2,
+        [data-theme="dark"] section[data-testid="stSidebar"] h3,
+        [data-theme="dark"] section[data-testid="stSidebar"] p,
+        [data-theme="dark"] section[data-testid="stSidebar"] label {
             color: #ffffff !important;
         }
         
@@ -538,7 +535,7 @@ def load_bootstrap_css():
         }
         
         /* Fix expander headers in sidebar */
-        section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        [data-theme="dark"] section[data-testid="stSidebar"] .streamlit-expanderHeader {
             background-color: #3b3b3b !important;
             color: #ffffff !important;
             border: 1px solid #555555 !important;
@@ -627,14 +624,14 @@ def load_bootstrap_css():
 def render_header():
     """Render clean, minimal header with branding"""
     # Render the fixed-position theme toggle
-    render_header_theme_toggle()
+    # render_header_theme_toggle()
     
     # Simple header with just branding and new feature highlight
-    col1, col2 = st.columns([3, 1])
+    # col1, col2 = st.columns([3, 1])
     
-    with col1:
-        st.title("🦙 RAG LlamaStack")
-        st.caption("Retrieval-Augmented Generation with LlamaStack & Ollama")
+    # with col1:
+    #     st.title("🦙 RAG LlamaStack")
+    #     st.caption("Retrieval-Augmented Generation with LlamaStack & Ollama")
 
 
 def render_sidebar():
@@ -644,7 +641,7 @@ def render_sidebar():
         st.markdown("### 🔌 System Status")
         
         # Connection status with real-time indicators
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             if validate_llamastack_connection():
                 st.success("🟢 LlamaStack")
@@ -662,25 +659,9 @@ def render_sidebar():
                     st.warning("🟡 Ollama")
             except Exception:
                 st.error("🔴 Ollama")
-        
-        # Quick setup info (collapsible)
-        with st.expander("⚙️ Configuration & Help", expanded=False):
-            st.markdown("""
-            **Current Setup:**
-            - 🔍 Embeddings: all-MiniLM-L6-v2 (sentence-transformers)
-            - 🧠 LLM: See Model Dashboard below
-            - 🌐 Web Processing: MCP Server + Fallback
-            
-            **Connection Issues?**
-            - Use diagnostics in Model Dashboard
-            - Check `llamastack-config.yaml`
-            - Restart with `make restart`
-            
-            **Performance Tips:**
-            - Add API providers for faster responses
-            - Use local Ollama models for privacy
-            - Mix file uploads with web URLs for comprehensive knowledge base
-            """)
+
+        with col3:
+            render_sidebar_theme_toggle()
         
         st.markdown("---")
         
@@ -745,6 +726,25 @@ def render_sidebar():
             st.markdown("### 🗄️ FAISS Database")
             st.info("FAISS dashboard component not available")
         
+        # Quick setup info (collapsible)
+        with st.expander("⚙️ Configuration & Help", expanded=False):
+            st.markdown("""
+            **Current Setup:**
+            - 🔍 Embeddings: all-MiniLM-L6-v2 (sentence-transformers)
+            - 🧠 LLM: See Model Dashboard below
+            - 🌐 Web Processing: MCP Server + Fallback
+            
+            **Connection Issues?**
+            - Use diagnostics in Model Dashboard
+            - Check `llamastack-config.yaml`
+            - Restart with `make restart`
+            
+            **Performance Tips:**
+            - Add API providers for faster responses
+            - Use local Ollama models for privacy
+            - Mix file uploads with web URLs for comprehensive knowledge base
+            """)
+            
         # Connection Diagnostics & Debug Tools (Bottom of navbar)
         st.markdown("---")
         with st.expander("🔍 Connection Diagnostics & Debug", expanded=False):
