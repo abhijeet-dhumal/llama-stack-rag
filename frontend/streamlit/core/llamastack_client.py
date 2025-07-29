@@ -4,10 +4,17 @@ Uses the official llama-stack-client package for proper integration
 """
 
 from llama_stack_client import LlamaStackClient as LS
+from llama_stack_client.types.event_param import UnstructuredLogEvent, MetricEvent, StructuredLogEvent
 import subprocess
 import json
+import time
 from typing import Optional, List, Dict, Any
+import hashlib
+import uuid
 
+def generate_hex_id() -> str:
+    """Generate a hex ID for telemetry"""
+    return hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()[:16]
 
 class LlamaStackClient:
     def __init__(self, base_url: str = "http://localhost:8321/v1"):
@@ -150,7 +157,7 @@ class LlamaStackClient:
         except Exception as e:
             print(f"❌ Error getting embeddings from LlamaStack: {e}")
             # Fallback to dummy embedding
-        return self._generate_dummy_embedding(text)
+            return self._generate_dummy_embedding(text)
     
     def _generate_dummy_embedding(self, text: str) -> List[float]:
         """Generate a dummy embedding for fallback"""
@@ -881,3 +888,531 @@ class LlamaStackClient:
                 "session_vectors": 0,
                 "is_empty": True
             } 
+
+    def log_telemetry_event(self, event_type: str, event_data: Dict[str, Any], ttl_seconds: int = 3600) -> bool:
+        """
+        Log a telemetry event using LlamaStack's official telemetry API
+        
+        Args:
+            event_type: Type of event (e.g., 'app_startup', 'document_processed', 'chat_interaction')
+            event_data: Dictionary containing event data
+            ttl_seconds: Time to live for the event in seconds (default: 1 hour)
+            
+        Returns:
+            bool: True if event was logged successfully, False otherwise
+        """
+        try:
+            # Use official client's telemetry API
+            from llama_stack_client.types.event_param import StructuredLogEvent
+            
+            # Create structured log event
+            event = StructuredLogEvent({
+                "event_type": event_type,
+                "data": event_data,
+                "metadata": {
+                    "source": "rag_llamastack_app",
+                    "version": "1.0.0",
+                    "environment": "production",
+                    "timestamp": time.time()
+                }
+            })
+            
+            # Log using official client
+            self.client.telemetry.log_event(
+                event=event,
+                ttl_seconds=ttl_seconds
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error logging telemetry event: {e}")
+            # Fallback to direct HTTP request
+            return self._log_telemetry_fallback(event_type, event_data, ttl_seconds)
+    
+    def log_metric(self, metric_name: str, value: float, tags: Dict[str, str] = None, ttl_seconds: int = 3600) -> bool:
+        """
+        Log a metric using LlamaStack's official telemetry API
+        
+        Args:
+            metric_name: Name of the metric
+            value: Numeric value of the metric
+            tags: Optional tags for the metric
+            ttl_seconds: Time to live for the metric in seconds (default: 1 hour)
+            
+        Returns:
+            bool: True if metric was logged successfully, False otherwise
+        """
+        try:
+            if tags is None:
+                tags = {}
+            
+            # Use official client's telemetry API
+            from llama_stack_client.types.event_param import MetricEvent
+            
+            # Create metric event
+            event = MetricEvent({
+                "metric_name": metric_name,
+                "value": value,
+                "unit": "count",
+                "tags": tags,
+                "timestamp": time.time()
+            })
+            
+            # Log using official client
+            self.client.telemetry.log_event(
+                event=event,
+                ttl_seconds=ttl_seconds
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error logging metric: {e}")
+            # Fallback to direct HTTP request
+            return self._log_metric_fallback(metric_name, value, tags, ttl_seconds)
+    
+    def log_unstructured_event(self, message: str, level: str = "info", additional_data: Dict[str, Any] = None, ttl_seconds: int = 3600) -> bool:
+        """
+        Log an unstructured event using LlamaStack's official telemetry API
+        
+        Args:
+            message: Log message
+            level: Log level (info, warning, error, debug, verbose, warn, critical)
+            additional_data: Additional data to include
+            ttl_seconds: Time to live for the event in seconds (default: 1 hour)
+            
+        Returns:
+            bool: True if event was logged successfully, False otherwise
+        """
+        try:
+            # Map level to correct severity values
+            severity_map = {
+                "info": "info",
+                "warning": "warn", 
+                "warn": "warn",
+                "error": "error",
+                "debug": "debug",
+                "verbose": "verbose",
+                "critical": "critical"
+            }
+            severity = severity_map.get(level.lower(), "info")
+            
+            # Use official client's telemetry API
+            from llama_stack_client.types.event_param import UnstructuredLogEvent
+            
+            # Create unstructured log event
+            event_data = {
+                "message": message,
+                "severity": severity,
+                "timestamp": time.time()
+            }
+            
+            if additional_data:
+                event_data.update(additional_data)
+            
+            event = UnstructuredLogEvent(event_data)
+            
+            # Log using official client
+            self.client.telemetry.log_event(
+                event=event,
+                ttl_seconds=ttl_seconds
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error logging unstructured event: {e}")
+            # Fallback to direct HTTP request
+            return self._log_unstructured_fallback(message, level, additional_data, ttl_seconds)
+    
+    def _log_telemetry_fallback(self, event_type: str, event_data: Dict[str, Any], ttl_seconds: int = 3600) -> bool:
+        """Fallback method using direct HTTP request for telemetry events"""
+        try:
+            event = {
+                "type": "structured_log",
+                "trace_id": generate_hex_id(),
+                "span_id": generate_hex_id(),
+                "timestamp": time.time(),
+                "payload": {
+                    "event_type": event_type,
+                    "data": event_data,
+                    "metadata": {
+                        "source": "rag_llamastack_app",
+                        "version": "1.0.0",
+                        "environment": "production"
+                    }
+                }
+            }
+            
+            import requests
+            response = requests.post(
+                f"{self.base_url}/telemetry/events",
+                json={
+                    "event": event,
+                    "ttl_seconds": ttl_seconds
+                },
+                headers={"Content-Type": "application/json"}
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"❌ Fallback telemetry logging failed: {e}")
+            return False
+    
+    def _log_metric_fallback(self, metric_name: str, value: float, tags: Dict[str, str] = None, ttl_seconds: int = 3600) -> bool:
+        """Fallback method using direct HTTP request for metrics"""
+        try:
+            if tags is None:
+                tags = {}
+            
+            event = {
+                "type": "metric",
+                "trace_id": generate_hex_id(),
+                "span_id": generate_hex_id(),
+                "timestamp": time.time(),
+                "metric": metric_name,
+                "value": value,
+                "unit": "count",
+                "tags": tags
+            }
+            
+            import requests
+            response = requests.post(
+                f"{self.base_url}/telemetry/events",
+                json={
+                    "event": event,
+                    "ttl_seconds": ttl_seconds
+                },
+                headers={"Content-Type": "application/json"}
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"❌ Fallback metric logging failed: {e}")
+            return False
+    
+    def _log_unstructured_fallback(self, message: str, level: str = "info", additional_data: Dict[str, Any] = None, ttl_seconds: int = 3600) -> bool:
+        """Fallback method using direct HTTP request for unstructured events"""
+        try:
+            severity_map = {
+                "info": "info",
+                "warning": "warn", 
+                "warn": "warn",
+                "error": "error",
+                "debug": "debug",
+                "verbose": "verbose",
+                "critical": "critical"
+            }
+            severity = severity_map.get(level.lower(), "info")
+            
+            event = {
+                "type": "unstructured_log",
+                "trace_id": generate_hex_id(),
+                "span_id": generate_hex_id(),
+                "timestamp": time.time(),
+                "message": message,
+                "severity": severity
+            }
+            
+            import requests
+            response = requests.post(
+                f"{self.base_url}/telemetry/events",
+                json={
+                    "event": event,
+                    "ttl_seconds": ttl_seconds
+                },
+                headers={"Content-Type": "application/json"}
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"❌ Fallback unstructured logging failed: {e}")
+            return False
+    
+    def query_telemetry_traces(self) -> List[Dict[str, Any]]:
+        """
+        Query telemetry traces from LlamaStack
+        
+        Returns:
+            List of trace data
+        """
+        try:
+            traces = self.client.telemetry.query_traces()
+            return traces if traces else []
+        except Exception as e:
+            print(f"❌ Error querying traces: {e}")
+            return []
+    
+    def query_telemetry_spans(self, attribute_filters: Dict[str, Any] = None, attributes_to_return: List[str] = None) -> List[Dict[str, Any]]:
+        """
+        Query telemetry spans from LlamaStack
+        
+        Args:
+            attribute_filters: Optional filters for spans
+            attributes_to_return: Optional list of attributes to return
+            
+        Returns:
+            List of span data
+        """
+        try:
+            if attribute_filters is None:
+                attribute_filters = {}
+            if attributes_to_return is None:
+                attributes_to_return = []
+            
+            spans = self.client.telemetry.query_spans(
+                attribute_filters=attribute_filters,
+                attributes_to_return=attributes_to_return
+            )
+            return spans if spans else []
+        except Exception as e:
+            print(f"❌ Error querying spans: {e}")
+            return []
+    
+    def get_telemetry_span(self, span_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific telemetry span by ID
+        
+        Args:
+            span_id: ID of the span to retrieve
+            
+        Returns:
+            Span data or None if not found
+        """
+        try:
+            span = self.client.telemetry.get_span(span_id=span_id)
+            return span
+        except Exception as e:
+            print(f"❌ Error getting span {span_id}: {e}")
+            return None
+    
+    def get_telemetry_trace(self, trace_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific telemetry trace by ID
+        
+        Args:
+            trace_id: ID of the trace to retrieve
+            
+        Returns:
+            Trace data or None if not found
+        """
+        try:
+            trace = self.client.telemetry.get_trace(trace_id=trace_id)
+            return trace
+        except Exception as e:
+            print(f"❌ Error getting trace {trace_id}: {e}")
+            return None
+    
+    def save_spans_to_dataset(self, dataset_id: str, span_ids: List[str]) -> bool:
+        """
+        Save telemetry spans to a dataset
+        
+        Args:
+            dataset_id: ID of the dataset to save to
+            span_ids: List of span IDs to save
+            
+        Returns:
+            bool: True if spans were saved successfully, False otherwise
+        """
+        try:
+            self.client.telemetry.save_spans_to_dataset(
+                dataset_id=dataset_id,
+                span_ids=span_ids
+            )
+            return True
+        except Exception as e:
+            print(f"❌ Error saving spans to dataset: {e}")
+            return False
+    
+    # Convenience methods for common telemetry events
+    def log_app_startup(self, version: str = "1.0.0", user_agent: str = "streamlit_app") -> bool:
+        """Log application startup event"""
+        return self.log_telemetry_event(
+            event_type="app_startup",
+            event_data={
+                "version": version,
+                "user_agent": user_agent,
+                "startup_time": time.time()
+            }
+        )
+    
+    def log_document_processed(self, file_type: str, file_size: int, chunks_created: int, processing_time: float) -> bool:
+        """Log document processing event"""
+        return self.log_telemetry_event(
+            event_type="document_processed",
+            event_data={
+                "file_type": file_type,
+                "file_size": file_size,
+                "chunks_created": chunks_created,
+                "processing_time": processing_time
+            }
+        )
+    
+    def log_chat_interaction(self, model_used: str, query_length: int, response_length: int, response_time: float) -> bool:
+        """Log chat interaction event"""
+        return self.log_telemetry_event(
+            event_type="chat_interaction",
+            event_data={
+                "model_used": model_used,
+                "query_length": query_length,
+                "response_length": response_length,
+                "response_time": response_time
+            }
+        )
+    
+    def log_vector_db_operation(self, operation: str, vector_db_id: str, vectors_count: int, operation_time: float) -> bool:
+        """Log vector database operation event"""
+        return self.log_telemetry_event(
+            event_type="vector_db_operation",
+            event_data={
+                "operation": operation,
+                "vector_db_id": vector_db_id,
+                "vectors_count": vectors_count,
+                "operation_time": operation_time
+            }
+        )
+    
+    def log_web_content_processed(self, url: str, content_length: int, processing_time: float, chunks_created: int) -> bool:
+        """Log web content processing event"""
+        return self.log_telemetry_event(
+            event_type="web_content_processed",
+            event_data={
+                "url": url,
+                "content_length": content_length,
+                "processing_time": processing_time,
+                "chunks_created": chunks_created
+            }
+        )
+    
+    def log_error(self, error_type: str, error_message: str, context: Dict[str, Any] = None) -> bool:
+        """Log error event"""
+        event_data = {
+            "error_type": error_type,
+            "error_message": error_message
+        }
+        if context:
+            event_data.update(context)
+        
+        return self.log_telemetry_event(
+            event_type="error",
+            event_data=event_data
+        ) 
+
+    def create_trace_context(self, operation_name: str) -> Dict[str, str]:
+        """
+        Create a trace context for correlating telemetry events
+        
+        Args:
+            operation_name: Name of the operation being traced
+            
+        Returns:
+            Dictionary with trace_id and span_id
+        """
+        trace_id = generate_hex_id()
+        span_id = generate_hex_id()
+        
+        return {
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "operation_name": operation_name,
+            "start_time": time.time()
+        }
+    
+    def log_trace_event(self, trace_context: Dict[str, str], event_type: str, event_data: Dict[str, Any], ttl_seconds: int = 3600) -> bool:
+        """
+        Log a telemetry event with trace context for correlation
+        
+        Args:
+            trace_context: Trace context from create_trace_context()
+            event_type: Type of event
+            event_data: Event data
+            ttl_seconds: Time to live for the event
+            
+        Returns:
+            bool: True if event was logged successfully, False otherwise
+        """
+        try:
+            # Add trace context to event data
+            event_data_with_trace = {
+                **event_data,
+                "trace_id": trace_context["trace_id"],
+                "span_id": trace_context["span_id"],
+                "operation_name": trace_context["operation_name"],
+                "timestamp": time.time()
+            }
+            
+            return self.log_telemetry_event(event_type, event_data_with_trace, ttl_seconds)
+            
+        except Exception as e:
+            print(f"❌ Error logging trace event: {e}")
+            return False
+    
+    def log_trace_metric(self, trace_context: Dict[str, str], metric_name: str, value: float, tags: Dict[str, str] = None, ttl_seconds: int = 3600) -> bool:
+        """
+        Log a metric with trace context for correlation
+        
+        Args:
+            trace_context: Trace context from create_trace_context()
+            metric_name: Name of the metric
+            value: Metric value
+            tags: Optional tags
+            ttl_seconds: Time to live for the metric
+            
+        Returns:
+            bool: True if metric was logged successfully, False otherwise
+        """
+        try:
+            if tags is None:
+                tags = {}
+            
+            # Add trace context to tags
+            tags_with_trace = {
+                **tags,
+                "trace_id": trace_context["trace_id"],
+                "span_id": trace_context["span_id"],
+                "operation_name": trace_context["operation_name"]
+            }
+            
+            return self.log_metric(metric_name, value, tags_with_trace, ttl_seconds)
+            
+        except Exception as e:
+            print(f"❌ Error logging trace metric: {e}")
+            return False
+    
+    def log_trace_completion(self, trace_context: Dict[str, str], success: bool = True, error_message: str = None, ttl_seconds: int = 3600) -> bool:
+        """
+        Log trace completion with duration and status
+        
+        Args:
+            trace_context: Trace context from create_trace_context()
+            success: Whether the operation was successful
+            error_message: Error message if operation failed
+            ttl_seconds: Time to live for the event
+            
+        Returns:
+            bool: True if event was logged successfully, False otherwise
+        """
+        try:
+            duration = time.time() - trace_context["start_time"]
+            
+            completion_data = {
+                "trace_id": trace_context["trace_id"],
+                "span_id": trace_context["span_id"],
+                "operation_name": trace_context["operation_name"],
+                "duration_seconds": duration,
+                "success": success,
+                "timestamp": time.time()
+            }
+            
+            if error_message:
+                completion_data["error_message"] = error_message
+            
+            return self.log_telemetry_event("trace_completion", completion_data, ttl_seconds)
+            
+        except Exception as e:
+            print(f"❌ Error logging trace completion: {e}")
+            return False 

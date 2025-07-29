@@ -23,26 +23,26 @@ def render_welcome_screen() -> None:
     
     # Main welcome message
     st.markdown("""
-    <div style="text-align: center;">
-        <h2>Welcome to your intelligent knowledge assistant</h2>
-        <p style="font-size: 1.1em; margin: 1.5rem 0;">
-            Upload documents or process web URLs to get started. I'll help you find information, 
-            answer questions, and explore your knowledge base from multiple sources.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
+        <div style="text-align: center;">
+            <h2>Welcome to your intelligent knowledge assistant</h2>
+            <p style="font-size: 1.1em; margin: 1.5rem 0;">
+                Upload documents or process web URLs to get started. I'll help you find information, 
+                answer questions, and explore your knowledge base from multiple sources.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
     # Enhanced getting started card with web content highlight
     st.success("""
-    **🎯 Get Started - Choose Your Source**
-    
-    **📄 Upload Files** using the sidebar →  
-    *Supported formats: TXT, PDF, MD, DOCX, PPTX (Max 50MB)*
-    
+        **🎯 Get Started - Choose Your Source**
+        
+        **📄 Upload Files** using the sidebar →  
+        *Supported formats: TXT, PDF, MD, DOCX, PPTX (Max 50MB)*
+        
     **🌐 Process Web URLs** ✨ →
-    *Extract content from articles, docs, Wikipedia in real-time*
-    """)
-    
+        *Extract content from articles, docs, Wikipedia in real-time*
+        """)
+        
     # Features overview with updated capabilities
     st.markdown("### ✨ What you can do:")
     
@@ -67,7 +67,7 @@ def render_welcome_screen() -> None:
         
         Instant embedding and analysis of web content
         """)
-    
+        
     # New feature spotlight
     st.markdown("---")
     st.markdown("### 🌟 Feature Spotlight")
@@ -92,7 +92,7 @@ def render_welcome_screen() -> None:
         - Local Ollama models for privacy
         - Real-time performance analytics
         """)
-
+    
     st.markdown("<br>" * 2, unsafe_allow_html=True)
 
 
@@ -598,7 +598,7 @@ def render_chat_interface() -> None:
                                         
                                         if content:
                                             doc_content = content
-                                            break
+                                        break
                             
                             # Create unique key using message index and document index
                             message_index = st.session_state.chat_history.index(message)
@@ -755,10 +755,15 @@ def render_chat_interface() -> None:
 
 def process_user_query(query: str) -> None:
     """Process user query and generate response with enhanced error handling"""
+    import time
+    
     print(f"🔍 DEBUG: Processing query: '{query}'")
     
     # Store current query for context filtering
     st.session_state.current_query = query
+    
+    # Record start time for telemetry
+    st.session_state.query_start_time = time.time()
     
     # Add user message to chat history immediately
     st.session_state.chat_history.append({
@@ -853,6 +858,19 @@ def process_user_query(query: str) -> None:
                     # Add debug info if using dummy embeddings
                     if not is_real_embedding:
                         assistant_response['debug_info'] = "Using demo embeddings - consider installing docling or configuring real embedding models"
+                    
+                    # Log telemetry event for successful chat interaction
+                    try:
+                        if 'llamastack_client' in st.session_state:
+                            response_time = time.time() - st.session_state.get('query_start_time', time.time())
+                            st.session_state.llamastack_client.log_chat_interaction(
+                                model_used=llm_model,
+                                query_length=len(query),
+                                response_length=len(response),
+                                response_time=response_time
+                            )
+                    except Exception as e:
+                        print(f"⚠️ Telemetry logging failed for chat interaction: {e}")
                     
                     st.session_state.chat_history.append(assistant_response)
                 else:

@@ -276,6 +276,15 @@ test-web:
 	@echo ""
 	@echo "🌐 Web integration test complete!"
 
+# Test improved telemetry integration
+test-telemetry:
+	@echo "📊 Testing improved telemetry integration..."
+	@echo ""
+	@echo "🧪 Running comprehensive telemetry tests..."
+	@python test_improved_telemetry.py
+	@echo ""
+	@echo "📊 Telemetry integration test complete!"
+
 # Clean cache and temporary files
 clean:
 	@echo "🧹 Cleaning cache and temporary files..."

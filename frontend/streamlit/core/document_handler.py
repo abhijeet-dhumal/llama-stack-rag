@@ -800,6 +800,19 @@ def process_web_url(url: str):
                         method_display = method_map.get(extraction_method, extraction_method)
                         st.info(f"🔧 **MCP Server Used:** {method_display}")
                     
+                    # Log telemetry event for successful web content processing
+                    try:
+                        if 'llamastack_client' in st.session_state:
+                            processing_time = time.time() - web_document.get('processed_at', time.time())
+                            st.session_state.llamastack_client.log_web_content_processed(
+                                url=url,
+                                content_length=web_document['character_count'],
+                                processing_time=processing_time,
+                                chunks_created=web_document['chunk_count']
+                            )
+                    except Exception as e:
+                        print(f"⚠️ Telemetry logging failed for web content: {e}")
+                    
                     # Show processing stats
                     col1, col2, col3 = st.columns(3)
                     with col1:
@@ -1587,6 +1600,18 @@ def process_uploaded_files(files: List[Any]) -> int:
                 - **Storage:** {storage_method}
                 - **Speed:** {total_time:.1f}s ({actual_size_mb/total_time:.1f} MB/s)
                 """)
+                
+                # Log telemetry event for successful document processing
+                try:
+                    if 'llamastack_client' in st.session_state:
+                        st.session_state.llamastack_client.log_document_processed(
+                            file_type=get_file_extension(file.name),
+                            file_size=int(actual_size_mb * 1024 * 1024),  # Convert to bytes
+                            chunks_created=len(chunks),
+                            processing_time=total_time
+                        )
+                except Exception as e:
+                    print(f"⚠️ Telemetry logging failed for {file.name}: {e}")
                 
                 # Mark this file as successfully processed
                 mark_upload_success(file_id)

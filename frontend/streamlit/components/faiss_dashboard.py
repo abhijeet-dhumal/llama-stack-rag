@@ -39,16 +39,16 @@ def render_faiss_dashboard():
     
         # Clean dashboard layout with tabs
         tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📋 Sources", "🔍 Search", "⚙️ Management"])
-
+    
         with tab1:
             render_clean_overview()
-
+    
         with tab2:
             render_documents_table()
-
+    
         with tab3:
             render_vectorio_search()
-
+    
         with tab4:
             render_crud_operations()
             
@@ -783,56 +783,222 @@ def render_delete_operations():
                     
                 except Exception as e:
                     st.error(f"❌ Error during deletion: {e}")
-    
-    with col2:
-        if st.button("🗑️ Clear All Data", type="secondary"):
-            st.error("⚠️ **DANGEROUS OPERATION**")
-            if st.checkbox("I understand this will permanently delete ALL data from VectorIO database"):
-                if st.checkbox("I confirm I want to delete everything"):
-                    try:
-                        st.warning("🔄 Clearing all data from VectorIO database...")
-                        
-                        # Show progress
-                        progress_bar = st.progress(0)
-                        status_text = st.empty()
-                        
-                        status_text.text("🗑️ Attempting to clear database...")
-                        progress_bar.progress(25)
-                        
-                        # Use the new clear method
-                        clear_success = st.session_state.llamastack_client.clear_all_vectors_from_vector_db(
-                            vector_db_id="faiss"
-                        )
-                        
-                        progress_bar.progress(75)
-                        status_text.text("🧹 Clearing session state...")
-                        
-                        if clear_success:
-                            # Clear session state
-                            keys_to_keep = ['llamastack_client', 'selected_llm_model']
-                            keys_to_clear = [key for key in st.session_state.keys() if key not in keys_to_keep]
-                            
-                            for key in keys_to_clear:
-                                del st.session_state[key]
-                            
-                            progress_bar.progress(100)
-                            status_text.text("✅ All data cleared successfully!")
-                            
-                        st.success("✅ **All data cleared from VectorIO database and session state**")
-                        st.info("🔄 **Database has been reset and is ready for new documents**")
-                        
-                        # Show confirmation of empty state
+        
+        with col2:
+            if st.button("🗑️ Clear All Data", type="secondary"):
+                st.error("⚠️ **DANGEROUS OPERATION**")
+                if st.checkbox("I understand this will permanently delete ALL data from VectorIO database"):
+                    if st.checkbox("I confirm I want to delete everything"):
                         try:
-                            stats = st.session_state.llamastack_client.get_database_stats("faiss")
-                            if stats.get('is_empty', True):
-                                st.success("📊 **Database Status**: Empty and ready for new content")
-                            else:
-                                st.warning("⚠️ **Note**: Some data may still be present in the database")
+                            st.warning("🔄 Clearing all data from VectorIO database...")
+                            
+                            # Show progress
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            
+                            status_text.text("🗑️ Attempting to clear database...")
+                            progress_bar.progress(25)
+                            
+                            # Use the new clear method
+                            clear_success = st.session_state.llamastack_client.clear_all_vectors_from_vector_db(
+                                vector_db_id="faiss"
+                            )
+                            
+                            progress_bar.progress(75)
+                            status_text.text("🧹 Clearing session state...")
+                            
+                            if clear_success:
+                                # Clear session state
+                                keys_to_keep = ['llamastack_client', 'selected_llm_model']
+                                keys_to_clear = [key for key in st.session_state.keys() if key not in keys_to_keep]
+                                
+                                for key in keys_to_clear:
+                                    del st.session_state[key]
+                                
+                                progress_bar.progress(100)
+                                status_text.text("✅ All data cleared successfully!")
+                                
+                                st.success("✅ **All data cleared from VectorIO database and session state**")
+                                st.info("🔄 **Database has been reset and is ready for new documents**")
+                                
+                                # Show confirmation of empty state
+                                try:
+                                    stats = st.session_state.llamastack_client.get_database_stats("faiss")
+                                    if stats.get('is_empty', True):
+                                        st.success("📊 **Database Status**: Empty and ready for new content")
+                                    else:
+                                        st.warning("⚠️ **Note**: Some data may still be present in the database")
+                                except Exception as e:
+                                    st.info(" **Database cleared successfully**")
+                                
                         except Exception as e:
-                            st.info(" **Database cleared successfully**")
+                            st.error(f"❌ Error clearing data: {e}")
+        
+        # Add manual API operation buttons
+        st.markdown("---")
+        st.markdown("**🔧 Manual API Operations**")
+        st.info("💡 These buttons perform direct API calls to delete and recreate the FAISS database")
+        
+        manual_col1, manual_col2 = st.columns(2)
+        
+        with manual_col1:
+            if st.button("🗑️ Delete FAISS Database (API)", type="secondary", help="Delete the FAISS database via LlamaStack API"):
+                try:
+                    import requests
+                    
+                    st.info("🗑️ Deleting FAISS database via API...")
+                    
+                    # Delete the FAISS database
+                    delete_response = requests.delete(
+                        "http://localhost:8321/v1/vector-dbs/faiss",
+                        timeout=10
+                    )
+                    
+                    if delete_response.status_code == 200:
+                        st.success("✅ FAISS database deleted successfully!")
+                        st.info(f"Response: {delete_response.status_code}")
                         
+                        # Clear session state
+                        if 'uploaded_documents' in st.session_state:
+                            st.session_state.uploaded_documents.clear()
+                        if 'documents' in st.session_state:
+                            st.session_state.documents.clear()
+                        if 'deleted_document_ids' in st.session_state:
+                            st.session_state.deleted_document_ids.clear()
+                        
+                        st.success("🧹 Session state cleared")
+                        
+                    elif delete_response.status_code == 404:
+                        st.warning("⚠️ FAISS database not found (already deleted or doesn't exist)")
+                    else:
+                        st.error(f"❌ Failed to delete database: {delete_response.status_code}")
+                        st.text(f"Response: {delete_response.text}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error deleting database: {e}")
+        
+        with manual_col2:
+            if st.button("🔄 Recreate FAISS Database (API)", type="secondary", help="Recreate the FAISS database via LlamaStack API"):
+                try:
+                    import requests
+                    import json
+                    
+                    st.info("🔄 Recreating FAISS database via API...")
+                    
+                    # Recreate the database
+                    create_data = {
+                        "vector_db_id": "faiss",
+                        "provider_id": "faiss",
+                        "embedding_model": "all-MiniLM-L6-v2"
+                    }
+                    
+                    create_response = requests.post(
+                        "http://localhost:8321/v1/vector-dbs",
+                        json=create_data,
+                        headers={"Content-Type": "application/json"},
+                        timeout=10
+                    )
+                    
+                    if create_response.status_code in [200, 201]:
+                        st.success("✅ FAISS database recreated successfully!")
+                        st.info(f"Response: {create_response.status_code}")
+                        
+                        # Show database info
+                        try:
+                            response_data = create_response.json()
+                            st.json(response_data)
+                        except:
+                            st.text(f"Response: {create_response.text}")
+                        
+                        st.success("🆕 Database is ready for new documents")
+                        
+                    else:
+                        st.error(f"❌ Failed to recreate database: {create_response.status_code}")
+                        st.text(f"Response: {create_response.text}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error recreating database: {e}")
+        
+        # Add a combined operation button
+        st.markdown("---")
+        st.markdown("**⚡ Quick Reset Operation**")
+        
+        if st.button("🔄 Reset FAISS Database (Delete + Recreate)", type="primary", help="Delete and recreate the FAISS database in one operation"):
+            try:
+                import requests
+                import json
+                
+                st.info("🔄 Performing complete FAISS database reset...")
+                
+                # Show progress
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                # Step 1: Delete database
+                status_text.text("🗑️ Step 1: Deleting existing database...")
+                progress_bar.progress(25)
+                
+                delete_response = requests.delete(
+                    "http://localhost:8321/v1/vector-dbs/faiss",
+                    timeout=10
+                )
+                
+                if delete_response.status_code not in [200, 404]:
+                    st.error(f"❌ Failed to delete database: {delete_response.status_code}")
+                    return
+                
+                # Step 2: Recreate database
+                status_text.text("🔄 Step 2: Recreating database...")
+                progress_bar.progress(75)
+                
+                create_data = {
+                    "vector_db_id": "faiss",
+                    "provider_id": "faiss",
+                    "embedding_model": "all-MiniLM-L6-v2"
+                }
+                
+                create_response = requests.post(
+                    "http://localhost:8321/v1/vector-dbs",
+                    json=create_data,
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if create_response.status_code in [200, 201]:
+                    # Step 3: Clear session state
+                    status_text.text("🧹 Step 3: Clearing session state...")
+                    progress_bar.progress(90)
+                    
+                    keys_to_keep = ['llamastack_client', 'selected_llm_model', 'selected_embedding_model']
+                    keys_to_clear = [key for key in st.session_state.keys() if key not in keys_to_keep]
+                    
+                    for key in keys_to_clear:
+                        del st.session_state[key]
+                    
+                    progress_bar.progress(100)
+                    status_text.text("✅ Database reset completed!")
+                    
+                    st.success("✅ **FAISS database reset completed successfully!**")
+                    st.info("🆕 **Database is empty and ready for new documents**")
+                    
+                    # Verify empty state
+                    try:
+                        stats = st.session_state.llamastack_client.get_database_stats("faiss")
+                        if stats.get('is_empty', True):
+                            st.success("📊 **Database Status**: Empty and ready for new content")
+                        else:
+                            st.warning("⚠️ **Note**: Some data may still be present")
                     except Exception as e:
-                        st.error(f"❌ Error clearing data: {e}")
+                        st.info("✅ Database reset completed")
+                        
+                else:
+                    st.error(f"❌ Failed to recreate database: {create_response.status_code}")
+                    st.text(f"Response: {create_response.text}")
+                    
+            except Exception as e:
+                st.error(f"❌ Error during database reset: {e}")
+                import traceback
+                st.text(f"Details: {traceback.format_exc()}") 
 
 def render_update_operations():
     """Render update operations"""

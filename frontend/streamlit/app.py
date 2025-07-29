@@ -78,6 +78,16 @@ def main():
         st.error("🔴 LlamaStack Offline")
         st.stop()
     
+    # Log application startup telemetry
+    try:
+        if 'llamastack_client' in st.session_state:
+            st.session_state.llamastack_client.log_app_startup(
+                version="1.0.0",
+                user_agent="streamlit_app"
+            )
+    except Exception as e:
+        print(f"⚠️ Telemetry logging failed for app startup: {e}")
+    
     # Header (no top menu bar)
     render_header()
     
@@ -785,6 +795,15 @@ def render_sidebar():
         except ImportError:
             st.markdown("### 🗄️ FAISS Database")
             st.info("FAISS dashboard component not available")
+            
+        # Telemetry Dashboard
+        st.markdown("---")
+        try:
+            from components.telemetry_dashboard import render_telemetry_dashboard
+            render_telemetry_dashboard()
+        except ImportError:
+            st.markdown("### 📊 Telemetry Dashboard")
+            st.info("Telemetry dashboard component not available")
             
         # Connection Diagnostics & Debug Tools (Bottom of navbar)
         st.markdown("---")

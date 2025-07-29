@@ -68,6 +68,15 @@ make start-frontend
 - **🧹 Data Management** - Clear all data or delete specific sources
 - **🔍 Search Interface** - Direct vector database querying and testing
 
+### 📊 **Telemetry Integration (NEW!)**
+- **📈 Application Metrics** - Real-time performance monitoring via LlamaStack telemetry
+- **🔍 Request Traces** - Detailed request/response tracing and analysis
+- **📋 Event Logging** - Comprehensive event logging for all application operations
+- **📊 Telemetry Dashboard** - Professional telemetry visualization and management
+- **🎯 Custom Events** - Support for custom event types and metrics
+- **⚡ Automatic Logging** - Automatic telemetry for document processing, chat interactions, and web content
+- **🔧 Telemetry API** - Full access to LlamaStack's telemetry capabilities
+
 ### 🛠️ **Advanced Features**
 - **📊 System Status Monitoring** - Real-time LlamaStack and Ollama health checks
 - **🩺 Connection Diagnostics** - Smart endpoint detection and troubleshooting
@@ -133,6 +142,7 @@ graph TB
         WEB_URL[🌐 Web URL Processing<br/>MCP Server + BeautifulSoup<br/>Real-time extraction]
         CHAT[💬 Chat Interface<br/>Session State<br/>Source Citations]
         DASH[📊 FAISS Dashboard<br/>Vector Database Management<br/>CRUD Operations]
+        TELEM[📊 Telemetry Dashboard<br/>Performance Monitoring<br/>Event Logging]
     end
     
     subgraph "🧠 Core Processing"
@@ -161,6 +171,7 @@ graph TB
     UI --> WEB_URL
     UI --> CHAT
     UI --> DASH
+    UI --> TELEM
     
     %% Processing Flow
     UPLOAD --> DOC_HANDLER
@@ -188,6 +199,7 @@ graph TB
     style OLLAMA fill:#e8f5e8
     style SESSION fill:#fce4ec
     style FAISS_DB fill:#fff8e1
+    style TELEM fill:#e8f4fd
 ```
 
 ### **Technology Stack**
@@ -213,6 +225,7 @@ graph LR
         OL[Ollama]
         HF[Hugging Face]
         FAISS[FAISS Vector DB]
+        TELEM[Telemetry API]
     end
     
     subgraph "📊 Data Processing"
@@ -238,6 +251,7 @@ graph LR
     LS --> ST_EMB
     LS --> OL
     LS --> FAISS
+    LS --> TELEM
     ST_EMB --> HF
     DOC --> PDF
     DOC --> CHUNK
@@ -287,6 +301,7 @@ flowchart TD
     style EMBED fill:#fff3e0
     style SEARCH fill:#f3e5f5
     style STORE fill:#fff8e1
+    style TELEM fill:#e8f4fd
 ```
 
 ---
@@ -444,6 +459,13 @@ providers:
       config:
         db_path: ../../data/vectors/faiss_store.db
         kvstore: sqlite
+  telemetry:
+    - provider_id: meta-reference
+      provider_type: inline::meta-reference
+      config:
+        service_name: rag_llamastack_app
+        sinks: console,sqlite
+        sqlite_db_path: ../../data/telemetry/trace_store.db
 ```
 
 ---
@@ -505,6 +527,20 @@ curl -X POST http://localhost:8321/v1/vector-dbs -H "Content-Type: application/j
 
 # Check database file
 ls -la data/vectors/
+```
+
+#### 🔴 **Telemetry Issues**
+```bash
+# Check telemetry endpoint
+curl http://localhost:8321/v1/telemetry/events
+
+# Test telemetry with a simple event
+curl -X POST http://localhost:8321/v1/telemetry/events \
+  -H "Content-Type: application/json" \
+  -d '{"event": {"event_type": "test", "data": {"message": "test"}}, "ttl_seconds": 3600}'
+
+# Check telemetry database
+ls -la data/telemetry/
 ```
 
 #### 🔴 **Services Not Running**
