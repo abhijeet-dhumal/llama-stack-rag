@@ -104,6 +104,6 @@ For optimal results, follow the configuration guidelines and best practices outl
 
 ---
 
-*Document Version: 1.0*  
-*Last Updated: 2024*  
-*Contact: support@example.com* 
+*Document Version: 1.0*
+*Last Updated: 2024*
+*Contact: support@example.com*

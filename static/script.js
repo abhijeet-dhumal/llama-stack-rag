@@ -8,23 +8,23 @@ const elements = {
     // Navigation
     navTabs: document.querySelectorAll('.nav-tab'),
     sections: document.querySelectorAll('.section'),
-    
+
     // Status
     statusDot: document.getElementById('status-dot'),
     statusText: document.getElementById('status-text'),
-    
+
     // Upload
     uploadBox: document.getElementById('upload-box'),
     fileInput: document.getElementById('file-input'),
     uploadQueue: document.getElementById('upload-queue'),
     queueList: document.getElementById('queue-list'),
-    
+
     // Query
     queryInput: document.getElementById('query-input'),
     queryBtn: document.getElementById('query-btn'),
     contextLimit: document.getElementById('context-limit'),
     queryResults: document.getElementById('query-results'),
-    
+
     // Dashboard
     docCount: document.getElementById('doc-count'),
     llmModel: document.getElementById('llm-model'),
@@ -34,7 +34,7 @@ const elements = {
     refreshStatsBtn: document.getElementById('refresh-stats'),
     clearDocsBtn: document.getElementById('clear-docs'),
     documentsContainer: document.getElementById('documents-container'),
-    
+
     // UI
     loadingOverlay: document.getElementById('loading-overlay'),
     toastContainer: document.getElementById('toast-container')
@@ -58,14 +58,14 @@ function setupEventListeners() {
     elements.navTabs.forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
-    
+
     // Upload
     elements.uploadBox.addEventListener('click', () => elements.fileInput.click());
     elements.uploadBox.addEventListener('dragover', handleDragOver);
     elements.uploadBox.addEventListener('drop', handleDrop);
     elements.uploadBox.addEventListener('dragleave', handleDragLeave);
     elements.fileInput.addEventListener('change', handleFileSelect);
-    
+
     // Query
     elements.queryBtn.addEventListener('click', handleQuery);
     elements.queryInput.addEventListener('keypress', (e) => {
@@ -73,10 +73,10 @@ function setupEventListeners() {
             handleQuery();
         }
     });
-    
+
     // Dashboard
     elements.refreshStatsBtn.addEventListener('click', loadDashboardData);
-    
+
     // Clear documents button
     if (elements.clearDocsBtn) {
         elements.clearDocsBtn.addEventListener('click', handleClearDocuments);
@@ -86,17 +86,17 @@ function setupEventListeners() {
 // Tab Management
 function switchTab(tabName) {
     currentTab = tabName;
-    
+
     // Update nav tabs
     elements.navTabs.forEach(tab => {
         tab.classList.toggle('active', tab.dataset.tab === tabName);
     });
-    
+
     // Update sections
     elements.sections.forEach(section => {
         section.classList.toggle('active', section.id === `${tabName}-section`);
     });
-    
+
     // Load data for specific tabs
     if (tabName === 'dashboard') {
         loadDashboardData();
@@ -108,7 +108,7 @@ async function checkSystemHealth() {
     try {
         const response = await fetch('/health');
         const data = await response.json();
-        
+
         updateSystemStatus(data.status, data.message);
     } catch (error) {
         updateSystemStatus('error', 'Cannot connect to server');
@@ -118,7 +118,7 @@ async function checkSystemHealth() {
 function updateSystemStatus(status, message) {
     elements.statusDot.className = `status-dot ${status}`;
     elements.statusText.textContent = message;
-    
+
     // Check every 30 seconds
     setTimeout(checkSystemHealth, 30000);
 }
@@ -137,7 +137,7 @@ function handleDragLeave(e) {
 function handleDrop(e) {
     e.preventDefault();
     elements.uploadBox.classList.remove('dragover');
-    
+
     const files = Array.from(e.dataTransfer.files);
     handleFiles(files);
 }
@@ -153,16 +153,16 @@ function handleFiles(files) {
         const fileExt = '.' + file.name.split('.').pop().toLowerCase();
         return validTypes.includes(fileExt);
     });
-    
+
     if (validFiles.length === 0) {
         showToast('error', 'No valid files selected. Please upload PDF, MD, TXT, or DOCX files.');
         return;
     }
-    
+
     validFiles.forEach(file => {
         addToUploadQueue(file);
     });
-    
+
     if (!isProcessing) {
         processUploadQueue();
     }
@@ -175,7 +175,7 @@ function addToUploadQueue(file) {
         status: 'pending',
         message: 'Waiting...'
     };
-    
+
     uploadQueue.push(queueItem);
     renderUploadQueue();
 }
@@ -185,10 +185,10 @@ function renderUploadQueue() {
         elements.uploadQueue.style.display = 'none';
         return;
     }
-    
+
     elements.uploadQueue.style.display = 'block';
     elements.queueList.innerHTML = '';
-    
+
     uploadQueue.forEach(item => {
         const queueItemEl = document.createElement('div');
         queueItemEl.className = `queue-item ${item.status}`;
@@ -228,39 +228,39 @@ function formatFileSize(bytes) {
 
 async function processUploadQueue() {
     if (isProcessing || uploadQueue.length === 0) return;
-    
+
     isProcessing = true;
-    
+
     while (uploadQueue.length > 0) {
         const item = uploadQueue.find(item => item.status === 'pending');
         if (!item) break;
-        
+
         item.status = 'processing';
         item.message = 'Uploading...';
         renderUploadQueue();
-        
+
         try {
             const formData = new FormData();
             formData.append('file', item.file);
-            
+
             const response = await fetch('/ingest', {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
                 item.status = 'success';
                 const chunksText = result.chunks_created === 1 ? 'chunk' : 'chunks';
                 item.message = `✅ Success! ${result.chunks_created} ${chunksText} created using ${result.metadata?.storage_method || 'Feast'}`;
-                
+
                 // Show detailed success message
                 if (result.chunks_created > 0) {
                     showToast('success', `📄 ${item.file.name}: ${result.chunks_created} ${chunksText} processed and stored`);
                 } else {
                     showToast('warning', `⚠️ ${item.file.name}: File processed but no chunks were created`);
                 }
-                
+
                 // Refresh dashboard data if user is on dashboard tab
                 if (currentTab === 'dashboard') {
                     console.log('🔄 Auto-refreshing dashboard after successful upload');
@@ -277,9 +277,9 @@ async function processUploadQueue() {
             item.message = `❌ Network error: ${error.message}`;
             showToast('error', `🌐 Network error uploading ${item.file.name}: ${error.message}`);
         }
-        
+
         renderUploadQueue();
-        
+
         // Remove successful items after a delay
         if (item.status === 'success') {
             setTimeout(() => {
@@ -288,9 +288,9 @@ async function processUploadQueue() {
             }, 3000);
         }
     }
-    
+
     isProcessing = false;
-    
+
     // Clear file input
     elements.fileInput.value = '';
 }
@@ -302,10 +302,10 @@ async function handleQuery() {
         showToast('warning', 'Please enter a question');
         return;
     }
-    
+
     elements.queryBtn.disabled = true;
     elements.queryBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    
+
     try {
         const response = await fetch('/query', {
             method: 'POST',
@@ -317,7 +317,7 @@ async function handleQuery() {
                 context_limit: parseInt(elements.contextLimit.value)
             })
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             displayQueryResults(result);
@@ -355,7 +355,7 @@ function displayQueryResults(result) {
             `).join('')}
         </div>
     `;
-    
+
     elements.queryResults.classList.add('show');
 }
 
@@ -363,14 +363,14 @@ function displayQueryResults(result) {
 async function loadDashboardData() {
     try {
         showLoading(true);
-        
+
         // Load stats and documents in parallel with cache-busting
         const timestamp = Date.now();
         const [statsResponse, documentsResponse] = await Promise.all([
             fetch(`/stats?t=${timestamp}`, { cache: 'no-cache' }),
             fetch(`/documents?t=${timestamp}`, { cache: 'no-cache' })
         ]);
-        
+
         if (statsResponse.ok) {
             const stats = await statsResponse.json();
             console.log('📊 Stats API response:', stats);
@@ -379,7 +379,7 @@ async function loadDashboardData() {
             console.error('❌ Stats API failed:', statsResponse.status, statsResponse.statusText);
             showToast('error', 'Failed to load dashboard statistics');
         }
-        
+
         if (documentsResponse.ok) {
             const documents = await documentsResponse.json();
             console.log('📚 Documents API response:', documents);
@@ -388,7 +388,7 @@ async function loadDashboardData() {
             console.error('❌ Documents API failed:', documentsResponse.status, documentsResponse.statusText);
             showToast('error', 'Failed to load documents list');
         }
-        
+
     } catch (error) {
         console.error('❌ Dashboard loading error:', error);
         showToast('error', `Failed to load dashboard data: ${error.message}`);
@@ -402,7 +402,7 @@ function updateDashboardStats(stats) {
     elements.llmModel.textContent = stats.llm_model || 'N/A';
     elements.embeddingModel.textContent = stats.embedding_model || 'N/A';
     elements.pipelineStatus.textContent = stats.pipeline_status || 'Unknown';
-    
+
     // Update status to reflect Feast + Milvus-lite architecture
     const isConnected = stats.vector_store_stats && stats.pipeline_status === 'ready';
     elements.dbStatus.textContent = isConnected ? 'Feast + Milvus-lite Connected' : 'Disconnected';
@@ -413,14 +413,14 @@ function updateDocumentsList(documents) {
         elements.documentsContainer.innerHTML = '<div class="loading">No documents found</div>';
         return;
     }
-    
+
     elements.documentsContainer.innerHTML = documents.documents.map(doc => `
         <div class="document-item">
             <div class="document-info">
                 <div class="document-name">📄 ${doc.title || 'Unknown Document'}</div>
                 <div class="document-meta">
-                    <span class="meta-badge">Type: ${doc.document_type}</span> • 
-                    <span class="meta-badge chunks">📊 ${doc.chunk_count || 'N/A'} chunks</span> • 
+                    <span class="meta-badge">Type: ${doc.document_type}</span> •
+                    <span class="meta-badge chunks">📊 ${doc.chunk_count || 'N/A'} chunks</span> •
                     <span class="meta-badge">📅 ${doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Unknown'}</span>
                 </div>
             </div>
@@ -433,14 +433,14 @@ async function handleClearDocuments() {
     if (!confirm('Are you sure you want to clear all documents? This action cannot be undone.')) {
         return;
     }
-    
+
     try {
         showLoading(true);
-        
+
         const response = await fetch('/documents', {
             method: 'DELETE'
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             showToast('success', 'All documents cleared successfully');
@@ -470,9 +470,9 @@ function showToast(type, message) {
             <div class="toast-message">${message}</div>
         </div>
     `;
-    
+
     elements.toastContainer.appendChild(toast);
-    
+
     // Auto remove after 5 seconds
     setTimeout(() => {
         toast.remove();
@@ -495,13 +495,13 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault();
         switchTab('upload');
     }
-    
+
     // Ctrl+Q for query tab
     if (e.ctrlKey && e.key === 'q') {
         e.preventDefault();
         switchTab('query');
     }
-    
+
     // Ctrl+D for dashboard tab
     if (e.ctrlKey && e.key === 'd') {
         e.preventDefault();
@@ -514,4 +514,4 @@ setInterval(() => {
     if (currentTab === 'dashboard') {
         loadDashboardData();
     }
-}, 30000); // Refresh every 30 seconds 
+}, 30000); // Refresh every 30 seconds

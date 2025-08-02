@@ -45,7 +45,7 @@ services:
 
   # RAG Pipeline API
   rag-pipeline:
-    build: 
+    build:
       context: ..
       dockerfile: deploy/Dockerfile
     container_name: rag-pipeline
@@ -120,4 +120,4 @@ volumes:
 
 networks:
   default:
-    name: rag-network 
+    name: rag-network

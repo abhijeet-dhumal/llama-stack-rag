@@ -1,13 +1,14 @@
-from feast import Entity, FeatureView, Field, FileSource, PushSource
-from feast.types import Array, Float32, String, Int64
-from feast.value_type import ValueType
 from datetime import timedelta
+
+from feast import Entity, FeatureView, Field, FileSource, PushSource
+from feast.types import Array, Float32, Int64, String
+from feast.value_type import ValueType
 
 # Define document entity
 document = Entity(
     name="document_id",
     value_type=ValueType.STRING,
-    description="Unique identifier for document chunks"
+    description="Unique identifier for document chunks",
 )
 
 # Define document embeddings data source (for batch loading)
@@ -30,10 +31,12 @@ document_embeddings = FeatureView(
     entities=[document],
     ttl=timedelta(days=365),
     schema=[
-        Field(name="vector", dtype=Array(Float32), vector_index=True),  # Official naming
+        Field(
+            name="vector", dtype=Array(Float32), vector_index=True
+        ),  # Official naming
         Field(name="item_id", dtype=Int64),  # Official pattern
         Field(name="chunk_text", dtype=String),
-        Field(name="document_title", dtype=String), 
+        Field(name="document_title", dtype=String),
         Field(name="chunk_index", dtype=Int64),
         Field(name="file_path", dtype=String),
         Field(name="chunk_length", dtype=Int64),

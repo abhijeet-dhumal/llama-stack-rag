@@ -35,12 +35,12 @@ class RAGCache:
     def __init__(self):
         self.redis_client = redis.from_url(REDIS_URL)
         self.ttl = CACHE_TTL
-    
+
     def _generate_key(self, query: str, context: str = "") -> str:
         """Generate cache key from query and context"""
         content = f"{query}:{context}"
         return f"rag:{hashlib.md5(content.encode()).hexdigest()}"
-    
+
     def get(self, query: str, context: str = "") -> Optional[dict]:
         """Get cached response"""
         key = self._generate_key(query, context)
@@ -48,13 +48,13 @@ class RAGCache:
         if cached:
             return json.loads(cached)
         return None
-    
+
     def set(self, query: str, response: dict, context: str = "") -> None:
         """Cache response"""
         key = self._generate_key(query, context)
         self.redis_client.setex(
-            key, 
-            self.ttl, 
+            key,
+            self.ttl,
             json.dumps(response)
         )
 ```
@@ -77,12 +77,12 @@ async def query_documents(request: QueryRequest):
             "cached": True,
             "response_time": 0.001  # Very fast cache hit
         }
-    
+
     # Process query if not cached
     start_time = time.time()
     result = await rag_pipeline.query(request.query)
     response_time = time.time() - start_time
-    
+
     # Cache the response
     cache_data = {
         "response": result["response"],
@@ -90,7 +90,7 @@ async def query_documents(request: QueryRequest):
         "response_time": response_time
     }
     cache.set(request.query, cache_data)
-    
+
     return {
         **cache_data,
         "cached": False
@@ -110,13 +110,13 @@ class OllamaPool:
         self.urls = ollama_urls
         self.session = aiohttp.ClientSession()
         self.current_index = 0
-    
+
     async def get_next_url(self) -> str:
         """Round-robin load balancing"""
         url = self.urls[self.current_index]
         self.current_index = (self.current_index + 1) % len(self.urls)
         return url
-    
+
     async def query(self, prompt: str) -> dict:
         """Query with automatic failover"""
         for attempt in range(len(self.urls)):
@@ -146,7 +146,7 @@ async def batch_similarity_search(queries: List[str], k: int = 5):
             vector_store.similarity_search(query, k=k)
         )
         tasks.append(task)
-    
+
     results = await asyncio.gather(*tasks, return_exceptions=True)
     return results
 
@@ -170,17 +170,17 @@ from concurrent.futures import ThreadPoolExecutor
 class AsyncRAGPipeline:
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=4)
-    
+
     async def process_query(self, query: str):
         """Process query asynchronously"""
         # Run CPU-bound operations in thread pool
         loop = asyncio.get_event_loop()
-        
+
         # Parallel execution
         tasks = [
             loop.run_in_executor(
-                self.executor, 
-                self.embedder.embed_query, 
+                self.executor,
+                self.embedder.embed_query,
                 query
             ),
             loop.run_in_executor(
@@ -189,13 +189,13 @@ class AsyncRAGPipeline:
                 query
             )
         ]
-        
+
         embedding, processed_query = await asyncio.gather(*tasks)
-        
+
         # Continue with async processing
         documents = await self.search_documents(embedding)
         response = await self.generate_response(processed_query, documents)
-        
+
         return response
 ```
 
@@ -332,4 +332,4 @@ artillery run --config load-test-sustained.yml
 - [ ] Alerting configuration
 - [ ] Documentation and training
 
-This architecture can realistically handle 1000+ concurrent users with proper implementation! 🎯 
+This architecture can realistically handle 1000+ concurrent users with proper implementation! 🎯

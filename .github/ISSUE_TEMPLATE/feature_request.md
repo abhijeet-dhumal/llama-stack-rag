@@ -83,4 +83,4 @@ Add any other context, screenshots, or examples about the feature request here.
 - [ ] I have searched for existing feature requests
 - [ ] I have checked the project roadmap
 - [ ] I have provided clear use cases
-- [ ] I have considered the impact on existing functionality 
+- [ ] I have considered the impact on existing functionality

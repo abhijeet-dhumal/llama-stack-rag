@@ -17,9 +17,9 @@ pull_model() {
     local model=$1
     local max_retries=3
     local retry=0
-    
+
     echo "📥 Pulling model: $model"
-    
+
     while [ $retry -lt $max_retries ]; do
         if curl -X POST http://ollama:11434/api/pull \
            -H "Content-Type: application/json" \
@@ -36,7 +36,7 @@ pull_model() {
             fi
         fi
     done
-    
+
     echo "💥 Failed to pull $model after $max_retries attempts"
     return 1
 }
@@ -58,4 +58,4 @@ curl -s http://ollama:11434/api/tags | jq -r '.models[].name' 2>/dev/null || ech
 echo ""
 echo "🚀 RAG Pipeline is ready to use!"
 echo "   Web UI: http://localhost:8000"
-echo "   API Docs: http://localhost:8000/docs" 
+echo "   API Docs: http://localhost:8000/docs"

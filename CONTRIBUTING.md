@@ -95,4 +95,4 @@ When reporting bugs, please include:
 
 ---
 
-**Happy coding!** 🚀 
+**Happy coding!** 🚀

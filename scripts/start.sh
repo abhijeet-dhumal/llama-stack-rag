@@ -31,25 +31,25 @@ print_banner() {
 
 check_dependencies() {
     echo -e "${YELLOW}Checking dependencies...${NC}"
-    
+
     # Check Python
     if ! command -v python3 &> /dev/null; then
         echo -e "${RED}Error: Python 3 not found${NC}"
         exit 1
     fi
-    
+
     # Check Ollama
     if ! command -v ollama &> /dev/null; then
         echo -e "${RED}Error: Ollama not found. Please install from https://ollama.com${NC}"
         exit 1
     fi
-    
+
     # Check container runtime (Podman preferred, Docker fallback)
     if command -v podman &> /dev/null; then
         export CONTAINER_CMD="podman"
         export COMPOSE_CMD="podman-compose"
         echo -e "${GREEN}✓ Found Podman${NC}"
-        
+
         # Check if podman-compose is available, fallback to podman with docker-compose
         if ! command -v podman-compose &> /dev/null; then
             if command -v docker-compose &> /dev/null; then
@@ -70,13 +70,13 @@ check_dependencies() {
         export CONTAINER_CMD=""
         export COMPOSE_CMD=""
     fi
-    
+
     echo -e "${GREEN}✓ Dependencies check passed${NC}"
 }
 
 install_models() {
     echo -e "${YELLOW}Installing Ollama models...${NC}"
-    
+
     for model in "${OLLAMA_MODELS[@]}"; do
         echo -e "${YELLOW}Installing model: $model${NC}"
         ollama pull "$model"
@@ -90,7 +90,7 @@ install_models() {
 
 start_ollama() {
     echo -e "${YELLOW}Starting Ollama service...${NC}"
-    
+
     # Check if Ollama is already running
     if pgrep -f "ollama serve" > /dev/null; then
         echo -e "${GREEN}✓ Ollama is already running${NC}"
@@ -98,7 +98,7 @@ start_ollama() {
         echo -e "${YELLOW}Starting Ollama server...${NC}"
         nohup ollama serve > ollama.log 2>&1 &
         sleep 3
-        
+
         if pgrep -f "ollama serve" > /dev/null; then
             echo -e "${GREEN}✓ Ollama started successfully${NC}"
         else
@@ -110,23 +110,23 @@ start_ollama() {
 
 start_api() {
     echo -e "${YELLOW}Starting RAG Pipeline API...${NC}"
-    
+
     # Check if virtual environment exists
     if [ ! -d "venv" ]; then
         echo -e "${YELLOW}Creating virtual environment...${NC}"
         python3 -m venv venv
     fi
-    
+
     # Activate virtual environment
     source venv/bin/activate
-    
+
     # Install dependencies
     echo -e "${YELLOW}Installing Python dependencies...${NC}"
     pip install -r requirements.txt
-    
+
     # Set environment variables
     export PYTHONPATH="$(pwd):$PYTHONPATH"
-    
+
     # Start the API
     echo -e "${GREEN}Starting API server on http://$DEFAULT_HOST:$DEFAULT_PORT${NC}"
     uvicorn src.api:app --host $DEFAULT_HOST --port $DEFAULT_PORT --reload
@@ -134,30 +134,30 @@ start_api() {
 
 start_podman_manual() {
     echo -e "${YELLOW}Starting containers manually with Podman...${NC}"
-    
+
     # Stop and remove any existing containers
     echo -e "${YELLOW}Cleaning up any existing containers...${NC}"
     podman stop ollama rag-pipeline 2>/dev/null || true
     podman rm ollama rag-pipeline 2>/dev/null || true
     podman pod rm rag-pod 2>/dev/null || true
-    
+
     # Create required directories for volume mounts
     echo -e "${YELLOW}Creating required directories...${NC}"
     mkdir -p chroma_db
     mkdir -p logs
     mkdir -p sample_docs
     mkdir -p ollama_data
-    
+
     # Create sample document if it doesn't exist
     if [ ! -f "sample_docs/sample_document.md" ]; then
         echo "# Sample Document
 
 This is a sample document for testing the RAG pipeline." > sample_docs/sample_document.md
     fi
-    
+
     # Create pod for services
     podman pod create --name rag-pod -p 8000:8000 -p 11434:11434 || true
-    
+
     # Start Ollama container
     echo -e "${YELLOW}Starting Ollama container...${NC}"
     podman run -d --name ollama \
@@ -166,11 +166,11 @@ This is a sample document for testing the RAG pipeline." > sample_docs/sample_do
         -e OLLAMA_ORIGINS=* \
         --restart unless-stopped \
         ollama/ollama:latest
-    
+
     # Build RAG pipeline image
     echo -e "${YELLOW}Building RAG pipeline image...${NC}"
     podman build -t rag-pipeline -f deploy/Dockerfile .
-    
+
     # Start RAG pipeline container
     echo -e "${YELLOW}Starting RAG pipeline container...${NC}"
     podman run -d --name rag-pipeline \
@@ -187,29 +187,29 @@ This is a sample document for testing the RAG pipeline." > sample_docs/sample_do
 
 start_docker() {
     echo -e "${YELLOW}Starting RAG Pipeline with containers...${NC}"
-    
+
     # Check dependencies first to set container runtime variables
     check_dependencies
-    
+
     # Check if we have container runtime
     if [ -z "$CONTAINER_CMD" ]; then
         echo -e "${RED}Error: No container runtime (Podman/Docker) found${NC}"
         exit 1
     fi
-    
+
     # Check if compose file exists
     if [ ! -f "deploy/docker-compose.yml" ]; then
         echo -e "${RED}Error: deploy/docker-compose.yml not found${NC}"
         exit 1
     fi
-    
+
     # Create required directories for volume mounts
     echo -e "${YELLOW}Creating required directories...${NC}"
     mkdir -p chroma_db
     mkdir -p logs
     mkdir -p sample_docs
     mkdir -p ollama_data
-    
+
     # Create sample document if it doesn't exist
     if [ ! -f "sample_docs/sample_document.md" ]; then
         echo "# Sample Document
@@ -228,16 +228,16 @@ This document contains sample content that can be used to test document ingestio
 ## Conclusion
 This sample document helps verify that the RAG pipeline is working correctly." > sample_docs/sample_document.md
     fi
-    
+
     # Check if we have compose command
     if [ -z "$COMPOSE_CMD" ]; then
         echo -e "${YELLOW}No compose command available, starting containers manually...${NC}"
         start_podman_manual
-        
+
         # Wait for services to be ready
         echo -e "${YELLOW}Waiting for services to start...${NC}"
         sleep 15
-        
+
         # Install models in Ollama container
         echo -e "${YELLOW}Installing models in Ollama container...${NC}"
         for model in "${OLLAMA_MODELS[@]}"; do
@@ -253,17 +253,17 @@ This sample document helps verify that the RAG pipeline is working correctly." >
                 fi
             fi
         done
-        
+
         echo -e "${GREEN}✓ Podman containers started successfully${NC}"
         echo -e "${GREEN}API available at: http://localhost:8000${NC}"
         echo -e "${GREEN}API docs available at: http://localhost:8000/docs${NC}"
         return
     fi
-    
+
     # Stop any existing containers first
     echo -e "${YELLOW}Stopping any existing containers...${NC}"
     (cd deploy && $COMPOSE_CMD down 2>/dev/null || true)
-    
+
     # Also clean up any leftover containers from manual runs
     if [ "$CONTAINER_CMD" = "podman" ]; then
         podman stop ollama rag-pipeline 2>/dev/null || true
@@ -273,15 +273,15 @@ This sample document helps verify that the RAG pipeline is working correctly." >
         docker stop ollama rag-pipeline 2>/dev/null || true
         docker rm ollama rag-pipeline 2>/dev/null || true
     fi
-    
+
     # Start services with compose
     echo -e "${YELLOW}Using $COMPOSE_CMD to start services...${NC}"
     (cd deploy && $COMPOSE_CMD up -d)
-    
+
     # Wait for services to be ready
     echo -e "${YELLOW}Waiting for services to start...${NC}"
     sleep 10
-    
+
     # Install models in Ollama container
     echo -e "${YELLOW}Installing models in Ollama container...${NC}"
     for model in "${OLLAMA_MODELS[@]}"; do
@@ -297,7 +297,7 @@ This sample document helps verify that the RAG pipeline is working correctly." >
             fi
         fi
     done
-    
+
     echo -e "${GREEN}✓ Container services started successfully${NC}"
     echo -e "${GREEN}API available at: http://localhost:8000${NC}"
     echo -e "${GREEN}API docs available at: http://localhost:8000/docs${NC}"
@@ -305,13 +305,13 @@ This sample document helps verify that the RAG pipeline is working correctly." >
 
 stop_services() {
     echo -e "${YELLOW}Stopping services...${NC}"
-    
+
     # Stop API server
     pkill -f "uvicorn src.api:app" || true
-    
+
     # Stop container services
     check_dependencies
-    
+
     if [ -f "deploy/docker-compose.yml" ] && [ -n "$COMPOSE_CMD" ]; then
         echo -e "${YELLOW}Stopping services with $COMPOSE_CMD...${NC}"
         (cd deploy && $COMPOSE_CMD down)
@@ -325,27 +325,27 @@ stop_services() {
         docker stop ollama rag-pipeline 2>/dev/null || true
         docker rm ollama rag-pipeline 2>/dev/null || true
     fi
-    
+
     echo -e "${GREEN}✓ Services stopped${NC}"
 }
 
 run_tests() {
     echo -e "${YELLOW}Running tests...${NC}"
-    
+
     # Activate virtual environment
     if [ -d "venv" ]; then
         source venv/bin/activate
     fi
-    
+
     # Run tests
     python -m pytest tests/ -v
 }
 
 show_status() {
     echo -e "${YELLOW}Service Status:${NC}"
-    
+
     check_dependencies
-    
+
     # Check Ollama (local or container)
     if pgrep -f "ollama serve" > /dev/null; then
         echo -e "${GREEN}✓ Ollama (local): Running${NC}"
@@ -356,7 +356,7 @@ show_status() {
     else
         echo -e "${RED}✗ Ollama: Not running${NC}"
     fi
-    
+
     # Check API (local or container)
     if pgrep -f "uvicorn src.api:app" > /dev/null; then
         echo -e "${GREEN}✓ API (local): Running${NC}"
@@ -367,7 +367,7 @@ show_status() {
     else
         echo -e "${RED}✗ API: Not running${NC}"
     fi
-    
+
     # Check container orchestration
     if [ -n "$COMPOSE_CMD" ] && (cd deploy && $COMPOSE_CMD ps 2>/dev/null | grep -q "Up"); then
         echo -e "${GREEN}✓ Container orchestration ($COMPOSE_CMD): Running${NC}"
@@ -405,7 +405,7 @@ show_help() {
 # Main script logic
 main() {
     print_banner
-    
+
     case "${1:-start}" in
         "start")
             check_dependencies
@@ -440,4 +440,4 @@ main() {
 }
 
 # Run main function
-main "$@" 
+main "$@"

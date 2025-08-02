@@ -80,7 +80,7 @@ A **production-ready** Retrieval-Augmented Generation (RAG) pipeline with advanc
 
 ### 🎯 Core Capabilities
 - 🏪 **Enterprise Feature Store** - Feast for advanced feature management & serving
-- 🚀 **High-Performance Vector DB** - Milvus-lite for scalable similarity search  
+- 🚀 **High-Performance Vector DB** - Milvus-lite for scalable similarity search
 - 🤖 **Advanced LLM** - Ollama with llama3.2:3b (3B parameters)
 - 🧠 **Smart Embeddings** - all-MiniLM-L6-v2 (384 dimensions)
 - 🔒 **100% Local Processing** - No data leaves your machine
@@ -89,7 +89,7 @@ A **production-ready** Retrieval-Augmented Generation (RAG) pipeline with advanc
 ### 📄 Document Management
 - **Multi-format Support** - PDF, Markdown, Text, and Word documents
 - **Smart Chunking** - Intelligent text segmentation with overlap
-- **Original Filename Preservation** - Maintains document identity  
+- **Original Filename Preservation** - Maintains document identity
 - **Real-time Processing** - Live feedback during upload
 - **Seamless Clear Operations** - PyMilvus-based collection management
 
@@ -121,7 +121,8 @@ A **production-ready** Retrieval-Augmented Generation (RAG) pipeline with advanc
 
 ## 📋 Prerequisites
 
-- **Python 3.11+** (required)
+- **Python 3.12+** (required)
+- **Poetry** (recommended) or pip (alternative)
 - **Ollama** (for LLM serving)
 - **At least 8GB RAM** (16GB recommended for optimal performance)
 - **5GB+ disk space** (for models and data)
@@ -130,6 +131,23 @@ A **production-ready** Retrieval-Augmented Generation (RAG) pipeline with advanc
 
 ### 1. **Clone and Setup**
 
+#### Option A: Poetry (Recommended)
+```bash
+# Clone the repository
+git clone <repo-url>
+cd rag-project
+
+# Install Poetry (if not already installed)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Install dependencies with Poetry
+poetry install --with=test,lint
+
+# Activate virtual environment
+poetry shell
+```
+
+#### Option B: Traditional pip
 ```bash
 # Clone the repository
 git clone <repo-url>
@@ -164,6 +182,20 @@ ollama pull llama3.2:3b
 
 ### 4. **Start the RAG Pipeline**
 
+#### With Poetry:
+```bash
+# Development mode (auto-reload)
+make dev
+# or
+poetry run uvicorn src.api:app --host 0.0.0.0 --port 8000 --reload
+
+# Production mode
+make run
+# or
+poetry run uvicorn src.api:app --host 0.0.0.0 --port 8000
+```
+
+#### With pip:
 ```bash
 # Start the FastAPI server
 uvicorn src.api:app --host 0.0.0.0 --port 8000
@@ -416,7 +448,7 @@ feast feature-views list
 # For better quality (requires more resources)
 ollama pull llama3.2:3b
 
-# For faster performance (lower quality)  
+# For faster performance (lower quality)
 ollama pull llama3.2:1b
 
 # Update model in configuration
@@ -472,6 +504,32 @@ export RAG_DEBUG_MODE=true
 
 Run the test suite to verify your setup:
 
+#### With Poetry (Recommended):
+```bash
+# Run all tests with verbose output
+make test
+# or
+poetry run pytest -v
+
+# Run tests with coverage
+make test-cov
+# or
+poetry run pytest --cov=src --cov-report=html
+
+# Run specific test class
+poetry run pytest tests/test_rag_pipeline.py::TestFeastRAGPipeline -v
+
+# Stop on first failure
+poetry run pytest -x
+
+# Format code before testing
+make format
+
+# Run all linting checks
+make lint
+```
+
+#### With pip:
 ```bash
 # Run all tests with verbose output
 python -m pytest tests/test_rag_pipeline.py -v

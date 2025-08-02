@@ -243,4 +243,4 @@ deploy/
 2. **Monitoring**: Implement Prometheus/Grafana monitoring
 3. **Backup**: Regular backup of persistent volumes
 4. **Updates**: Rolling updates for zero-downtime deployments
-5. **Load Testing**: Validate performance under expected load 
+5. **Load Testing**: Validate performance under expected load

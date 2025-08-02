@@ -194,19 +194,19 @@ spec:
         args:
         - |
           echo "🚀 Initializing Ollama models..."
-          
+
           echo "📥 Pulling nomic-embed-text..."
           curl -X POST http://ollama-service:11434/api/pull \
             -H "Content-Type: application/json" \
             -d '{"name":"nomic-embed-text"}' \
             --max-time 1800
-          
+
           echo "📥 Pulling llama3.2:1b..."
           curl -X POST http://ollama-service:11434/api/pull \
             -H "Content-Type: application/json" \
             -d '{"name":"llama3.2:1b"}' \
             --max-time 1800
-          
+
           echo "🎉 Model initialization complete!"
 
 ---
@@ -245,7 +245,7 @@ spec:
             name: feast-rag-config
         volumeMounts:
         - name: feast-data
-                      mountPath: /app/feast_feature_repo/data
+          mountPath: /app/feast_feature_repo/data
         - name: rag-logs
           mountPath: /app/logs
         resources:
@@ -333,5 +333,3 @@ spec:
             name: rag-pipeline-service
             port:
               number: 8000
-
- 
