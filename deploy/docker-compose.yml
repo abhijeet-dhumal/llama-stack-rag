@@ -52,19 +52,22 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ../chroma_db:/app/chroma_db
+      - feast_data:/app/feast_feature_repo/data
       - ../sample_docs:/app/sample_docs
       - ../logs:/app/logs
       - ../static:/app/static
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - VECTOR_DB_PATH=/app/chroma_db
-      - LOG_LEVEL=INFO
-      - ENVIRONMENT=production
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
-      - CORS_ORIGINS=*
-      - MAX_UPLOAD_SIZE=10485760  # 10MB
+      # Feast RAG Pipeline configuration
+      - RAG_API_HOST=0.0.0.0
+      - RAG_API_PORT=8000
+      - RAG_OLLAMA_HOST=ollama
+      - RAG_OLLAMA_PORT=11434
+      - RAG_FEAST_REPO_PATH=/app/feast_feature_repo
+      - RAG_MILVUS_URI=/app/feast_feature_repo/data/online_store.db
+      - RAG_LOG_LEVEL=INFO
+      - RAG_DEBUG_MODE=false
+      - RAG_ENABLE_CORS=true
+      - RAG_MAX_FILE_SIZE=104857600  # 100MB
     depends_on:
       model-init:
         condition: service_completed_successfully
@@ -113,6 +116,7 @@ services:
 volumes:
   redis_data:
   ollama_data:
+  feast_data:
 
 networks:
   default:

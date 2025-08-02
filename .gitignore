@@ -21,6 +21,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+venv/
+.venv/
+.env*
 
 # PyInstaller
 *.manifest
@@ -73,6 +76,8 @@ Thumbs.db
 # Project specific
 # Vector database
 chroma_db/
+volumes/
+feast_feature_repo/data/
 *.db
 *.sqlite
 

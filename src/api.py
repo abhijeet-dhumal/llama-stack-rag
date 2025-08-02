@@ -16,62 +16,69 @@ import logging
 import asyncio
 from contextlib import asynccontextmanager
 
-from .rag_pipeline import RAGPipeline, BatchProcessor
+from .feast_rag_pipeline import FeastRAGPipeline
+from config.settings import get_settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global RAG pipeline instance
-rag_pipeline = None
+# Global Feast RAG pipeline instance
+feast_pipeline = None
 batch_processor = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    global rag_pipeline, batch_processor
+    global feast_pipeline, batch_processor
     
     # Startup
-    logger.info("Starting RAG Pipeline initialization...")
+    logger.info("Starting Feast RAG Pipeline initialization...")
     try:
-        # Start initialization in background
-        asyncio.create_task(initialize_pipeline())
+        # Initialize pipeline synchronously during startup
+        await initialize_pipeline()
         yield
     except Exception as e:
-        logger.error(f"Failed to start RAG Pipeline: {str(e)}")
+        logger.error(f"Failed to start Feast RAG Pipeline: {str(e)}")
         raise
     
     # Shutdown
-    logger.info("Shutting down RAG Pipeline...")
+    logger.info("Shutting down Feast RAG Pipeline...")
 
 async def initialize_pipeline():
-    """Initialize the RAG pipeline asynchronously"""
-    global rag_pipeline, batch_processor
+    """Initialize the Feast RAG pipeline asynchronously"""
+    global feast_pipeline, batch_processor
     try:
-        logger.info("Initializing RAG Pipeline...")
-        rag_pipeline = RAGPipeline()
-        batch_processor = BatchProcessor(rag_pipeline)
-        logger.info("RAG Pipeline initialized successfully")
+        logger.info("Initializing Feast RAG Pipeline...")
+        pipeline = FeastRAGPipeline()
+        feast_pipeline = pipeline  # Explicit assignment
+        # Note: batch_processor may need updating for Feast integration
+        batch_processor = None  # Skip batch processor for now
+        logger.info(f"Feast RAG Pipeline initialized successfully: {feast_pipeline is not None}")
+        logger.info(f"Pipeline feast_store: {feast_pipeline.feast_store is not None}")
     except Exception as e:
-        logger.error(f"Failed to initialize RAG Pipeline: {str(e)}")
-        rag_pipeline = None
+        logger.error(f"Failed to initialize Feast RAG Pipeline: {str(e)}")
+        feast_pipeline = None
         batch_processor = None
+
+# Get settings
+settings = get_settings()
 
 # Create FastAPI app
 app = FastAPI(
-    title="Local RAG Pipeline",
-    description="A local RAG pipeline using Ollama, Docling, and ChromaDB",
-    version="1.0.0",
+    title=settings.api_title,
+    description="A RAG pipeline using Feast feature store with file-based milvus-lite for simplified vector storage and retrieval",
+    version="2.1.0",
     lifespan=lifespan
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=settings.allowed_methods,
+    allow_headers=settings.allowed_headers,
 )
 
 # Mount static files
@@ -141,34 +148,43 @@ async def api_info():
 @app.get("/health", response_model=Dict[str, str])
 async def health_check():
     """Health check endpoint"""
-    if rag_pipeline is None:
+    if feast_pipeline is None:
         return {
             "status": "initializing",
-            "message": "RAG pipeline is still initializing (downloading models)"
+            "message": "Feast RAG pipeline is still initializing"
         }
     
     try:
-        stats = rag_pipeline.get_stats()
-        return {
-            "status": "healthy",
-            "pipeline_status": stats.get("pipeline_status", "unknown"),
-            "message": "RAG pipeline is running"
-        }
+        # Use Feast retriever health check
+        if hasattr(feast_pipeline, 'feast_retriever') and feast_pipeline.feast_retriever:
+            health = feast_pipeline.feast_retriever.health_check()
+            return {
+                "status": "healthy",
+                "feast_store": str(health.get("feast_store", False)),
+                "milvus_connection": str(health.get("milvus_connection", False)),
+                "embedding_model": str(health.get("embedding_model", False)),
+                "message": "Feast RAG pipeline is running with unified Milvus backend"
+            }
+        else:
+            return {
+                "status": "healthy",
+                "message": "Feast RAG pipeline is running"
+            }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {
             "status": "unhealthy",
-            "message": f"RAG pipeline error: {str(e)}"
+            "message": f"Feast RAG pipeline error: {str(e)}"
         }
 
 
 @app.post("/ingest", response_model=IngestionResponse)
 async def ingest_document(file: UploadFile = File(...)):
-    """Ingest a PDF document into the RAG system"""
-    if rag_pipeline is None:
+    """Ingest a document into the Feast RAG system"""
+    if feast_pipeline is None:
         raise HTTPException(
             status_code=503,
-            detail="RAG pipeline is still initializing. Please wait for model download to complete."
+            detail="Feast RAG pipeline is still initializing. Please wait for initialization to complete."
         )
     
     if not file.filename.endswith(('.pdf', '.md', '.txt', '.docx')):
@@ -189,11 +205,42 @@ async def ingest_document(file: UploadFile = File(...)):
             
             logger.info(f"Processing uploaded file: {file.filename}")
             
-            # Process the document with original filename
-            result = rag_pipeline.ingest_document(tmp_file_path, original_filename=file.filename)
+            # Process the document with Feast pipeline (async)
+            result = await feast_pipeline.process_document(tmp_file_path, file.filename)
             
-            logger.info(f"Successfully ingested: {file.filename}")
-            return IngestionResponse(**result)
+            # Check if processing failed
+            if result.get("status") == "error":
+                error_msg = result.get("message", "Unknown error during processing")
+                logger.error(f"Failed to ingest document {file.filename}: {error_msg}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to ingest document: {error_msg}"
+                )
+            
+            # Adapt result format for API response (match IngestionResponse model)
+            storage_method = result.get('storage_method', 'feast')
+            chunks_created = result.get('chunks_created', 0)
+            
+            # Create appropriate message based on success/failure
+            if chunks_created > 0:
+                message = f"Successfully ingested {file.filename} with {chunks_created} chunks using {storage_method}"
+            else:
+                message = f"Processed {file.filename} but no chunks were created using {storage_method}"
+            
+            adapted_result = {
+                "message": message,
+                "chunks_created": chunks_created,
+                "source": file.filename,
+                "metadata": {
+                    "storage_method": storage_method,
+                    "status": result.get("status", "success"),
+                    "file_name": result.get("file_name", file.filename),
+                    "document_id": f"feast_{file.filename}_{chunks_created}"
+                }
+            }
+            
+            logger.info(f"Processed: {file.filename} with {chunks_created} chunks (status: {result.get('status')})")
+            return IngestionResponse(**adapted_result)
             
         except Exception as e:
             logger.error(f"Error ingesting document {file.filename}: {str(e)}")
@@ -263,11 +310,11 @@ async def ingest_documents_batch(
 
 @app.post("/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
-    """Query the RAG system"""
-    if rag_pipeline is None:
+    """Query the Feast RAG system"""
+    if feast_pipeline is None:
         raise HTTPException(
             status_code=503,
-            detail="RAG pipeline is still initializing. Please wait for model download to complete."
+            detail="Feast RAG pipeline is still initializing. Please wait for initialization to complete."
         )
     
     if not request.question.strip():
@@ -279,14 +326,31 @@ async def query_documents(request: QueryRequest):
     try:
         logger.info(f"Processing query: {request.question[:100]}...")
         
-        result = rag_pipeline.query(
+        # Use Feast pipeline's async query method
+        result = await feast_pipeline.query_documents(
             request.question, 
-            context_limit=request.context_limit
+            top_k=request.context_limit
         )
         
-        logger.info(f"Query processed successfully, found {result['context_used']} relevant chunks")
+        # Adapt result format for API response (match QueryResponse model)
+        context_docs = result.get("context_documents", [])
+        adapted_result = {
+            "answer": result.get("answer", ""),
+            "sources": [
+                {
+                    "content": doc.get("text", ""),
+                    "metadata": doc.get("metadata", {}),
+                    "similarity_score": doc.get("similarity_score", 0.0)
+                }
+                for doc in context_docs
+            ],
+            "context_used": result.get("retrieved_chunks", 0),
+            "relevance_scores": [doc.get("similarity_score", 0.0) for doc in context_docs]
+        }
         
-        return QueryResponse(**result)
+        logger.info(f"Query processed successfully, found {adapted_result['context_used']} relevant chunks using feast")
+        
+        return QueryResponse(**adapted_result)
         
     except Exception as e:
         logger.error(f"Query processing failed: {str(e)}")
@@ -300,7 +364,34 @@ async def query_documents(request: QueryRequest):
 async def get_pipeline_stats():
     """Get pipeline statistics"""
     try:
-        stats = rag_pipeline.get_stats()
+        if feast_pipeline is None:
+            # Pipeline not initialized yet
+            stats = {
+                "pipeline_status": "initializing",
+                        "embedding_model": settings.embedding_model,
+        "llm_model": settings.llm_model,
+                "vector_store_stats": {
+                    "collection_name": "rag_document_embeddings",
+                    "document_count": 0,
+                    "backend": "feast_milvus_initializing"
+                }
+            }
+        else:
+            # Get real database statistics
+            db_stats = await feast_pipeline.get_database_stats()
+            
+            stats = {
+                "pipeline_status": "ready",
+                        "embedding_model": settings.embedding_model,
+        "llm_model": settings.llm_model, 
+                "vector_store_stats": {
+                    "collection_name": db_stats.get("collection_name", "rag_document_embeddings"),
+                    "document_count": db_stats.get("document_count", 0),
+                    "chunk_count": db_stats.get("chunk_count", 0),
+                    "backend": db_stats.get("backend", "feast_milvus_lite")
+                }
+            }
+        
         return StatsResponse(**stats)
     except Exception as e:
         logger.error(f"Error getting stats: {str(e)}")
@@ -312,49 +403,52 @@ async def get_pipeline_stats():
 
 @app.get("/documents", response_model=Dict[str, Any])
 async def list_documents():
-    """List ingested documents"""
-    if rag_pipeline is None:
-        raise HTTPException(
-            status_code=503,
-            detail="RAG pipeline is still initializing. Please wait for model download to complete."
-        )
+    """List ingested documents from Feast"""
+    if feast_pipeline is None:
+        return {
+            "documents": [],
+            "total_documents": 0,
+            "collection_name": "rag_document_embeddings",
+            "backend": "feast_milvus_unavailable",
+            "status": "active"
+        }
     
     try:
-        documents = rag_pipeline.get_documents()
-        stats = rag_pipeline.get_stats()
-        
+        documents_data = await feast_pipeline.get_documents_list()
         return {
-            "documents": documents,
-            "total_documents": stats['vector_store_stats']['document_count'],
-            "collection_name": stats['vector_store_stats']['collection_name'],
+            "documents": documents_data.get("documents", []),
+            "total_documents": documents_data.get("total_documents", 0),
+            "collection_name": documents_data.get("collection_name", "rag_document_embeddings"),
+            "backend": documents_data.get("backend", "feast_milvus_lite"),
             "status": "active"
         }
     except Exception as e:
-        logger.error(f"Error listing documents: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list documents: {str(e)}"
-        )
+        logger.error(f"Error listing documents from Feast: {str(e)}")
+        return {
+            "documents": [],
+            "total_documents": 0,
+            "collection_name": "rag_document_embeddings",
+            "backend": "feast_milvus_lite_error",
+            "status": "active"
+        }
 
 
 @app.delete("/documents")
 async def clear_documents():
     """Clear all documents from the vector store"""
-    if rag_pipeline is None:
+    if feast_pipeline is None:
         raise HTTPException(
             status_code=503,
-            detail="RAG pipeline is still initializing. Please wait for model download to complete."
+            detail="Feast RAG pipeline is still initializing. Please wait for initialization to complete."
         )
     
     try:
-        result = rag_pipeline.clear_documents()
-        if result["status"] == "success":
-            return result
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=result["message"]
-            )
+        await feast_pipeline.clear_collection()
+        return {
+            "status": "success",
+            "message": "Successfully cleared all documents from Feast Milvus database",
+            "backend": "feast_milvus"
+        }
     except Exception as e:
         logger.error(f"Error clearing documents: {str(e)}")
         raise HTTPException(
@@ -368,8 +462,10 @@ async def list_models():
     """List available models"""
     try:
         return {
-            "embedding_model": rag_pipeline.embedder.model_name,
-            "llm_model": rag_pipeline.llm.model_name,
+            "embedding_model": settings.embedding_model,
+            "llm_model": settings.llm_model,
+            "vector_store": "feast_milvus",
+            "feature_store": "feast",
             "status": "active"
         }
     except Exception as e:
@@ -408,8 +504,8 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "api:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.api_reload,
         log_level="info"
     ) 

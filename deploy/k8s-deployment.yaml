@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: llama-stack-rag
+  name: feast-rag-pipeline
   labels:
-    name: llama-stack-rag
+    name: feast-rag-pipeline
 
 ---
 # Persistent Volume Claims
@@ -11,7 +11,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ollama-models-pvc
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
 spec:
   accessModes:
     - ReadWriteOnce
@@ -23,21 +23,21 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: chroma-db-pvc
-  namespace: llama-stack-rag
+  name: feast-data-pvc
+  namespace: feast-rag-pipeline
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: rag-logs-pvc
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
 spec:
   accessModes:
     - ReadWriteOnce
@@ -50,17 +50,21 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: rag-config
-  namespace: llama-stack-rag
+  name: feast-rag-config
+  namespace: feast-rag-pipeline
 data:
-  OLLAMA_BASE_URL: "http://ollama-service:11434"
-  VECTOR_DB_PATH: "/app/chroma_db"
-  LOG_LEVEL: "INFO"
-  ENVIRONMENT: "production"
-  API_HOST: "0.0.0.0"
-  API_PORT: "8000"
-  CORS_ORIGINS: "*"
-  MAX_UPLOAD_SIZE: "10485760"
+  RAG_API_HOST: "0.0.0.0"
+  RAG_API_PORT: "8000"
+  RAG_OLLAMA_HOST: "ollama-service"
+  RAG_OLLAMA_PORT: "11434"
+  RAG_FEAST_REPO_PATH: "/app/feast_feature_repo"
+  RAG_MILVUS_URI: "/app/feast_feature_repo/data/online_store.db"
+  RAG_EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  RAG_LLM_MODEL: "llama3.2:3b"
+  RAG_LOG_LEVEL: "INFO"
+  RAG_DEBUG_MODE: "false"
+  RAG_ENABLE_CORS: "true"
+  RAG_MAX_FILE_SIZE: "104857600"
 
 ---
 # Ollama Deployment (simplified)
@@ -68,7 +72,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ollama-deployment
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
   labels:
     app: ollama
 spec:
@@ -142,7 +146,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ollama-service
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
   labels:
     app: ollama
 spec:
@@ -161,7 +165,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: model-init-job
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
   labels:
     app: model-init
 spec:
@@ -211,7 +215,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rag-pipeline-deployment
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
   labels:
     app: rag-pipeline
   annotations:
@@ -238,10 +242,10 @@ spec:
         - containerPort: 8000
         envFrom:
         - configMapRef:
-            name: rag-config
+            name: feast-rag-config
         volumeMounts:
-        - name: chroma-db
-          mountPath: /app/chroma_db
+        - name: feast-data
+                      mountPath: /app/feast_feature_repo/data
         - name: rag-logs
           mountPath: /app/logs
         resources:
@@ -276,9 +280,9 @@ spec:
           timeoutSeconds: 10
           failureThreshold: 15
       volumes:
-      - name: chroma-db
+      - name: feast-data
         persistentVolumeClaim:
-          claimName: chroma-db-pvc
+          claimName: feast-data-pvc
       - name: rag-logs
         persistentVolumeClaim:
           claimName: rag-logs-pvc
@@ -289,7 +293,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: rag-pipeline-service
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
   labels:
     app: rag-pipeline
 spec:
@@ -308,7 +312,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: rag-pipeline-ingress
-  namespace: llama-stack-rag
+  namespace: feast-rag-pipeline
   labels:
     app: rag-pipeline
   annotations:

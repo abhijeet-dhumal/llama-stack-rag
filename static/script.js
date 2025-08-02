@@ -76,7 +76,11 @@ function setupEventListeners() {
     
     // Dashboard
     elements.refreshStatsBtn.addEventListener('click', loadDashboardData);
-    elements.clearDocsBtn.addEventListener('click', handleClearDocuments);
+    
+    // Clear documents button
+    if (elements.clearDocsBtn) {
+        elements.clearDocsBtn.addEventListener('click', handleClearDocuments);
+    }
 }
 
 // Tab Management
@@ -247,18 +251,31 @@ async function processUploadQueue() {
             if (response.ok) {
                 const result = await response.json();
                 item.status = 'success';
-                item.message = `Success! ${result.chunks_created} chunks created`;
-                showToast('success', `Successfully uploaded ${item.file.name}`);
+                const chunksText = result.chunks_created === 1 ? 'chunk' : 'chunks';
+                item.message = `✅ Success! ${result.chunks_created} ${chunksText} created using ${result.metadata?.storage_method || 'Feast'}`;
+                
+                // Show detailed success message
+                if (result.chunks_created > 0) {
+                    showToast('success', `📄 ${item.file.name}: ${result.chunks_created} ${chunksText} processed and stored`);
+                } else {
+                    showToast('warning', `⚠️ ${item.file.name}: File processed but no chunks were created`);
+                }
+                
+                // Refresh dashboard data if user is on dashboard tab
+                if (currentTab === 'dashboard') {
+                    console.log('🔄 Auto-refreshing dashboard after successful upload');
+                    setTimeout(() => loadDashboardData(), 1000); // Small delay to ensure data is committed
+                }
             } else {
                 const error = await response.json();
                 item.status = 'error';
-                item.message = error.detail || 'Upload failed';
+                item.message = `❌ ${error.detail || 'Upload failed'}`;
                 showToast('error', `Failed to upload ${item.file.name}: ${error.detail}`);
             }
         } catch (error) {
             item.status = 'error';
-            item.message = 'Network error';
-            showToast('error', `Network error uploading ${item.file.name}`);
+            item.message = `❌ Network error: ${error.message}`;
+            showToast('error', `🌐 Network error uploading ${item.file.name}: ${error.message}`);
         }
         
         renderUploadQueue();
@@ -326,10 +343,10 @@ function displayQueryResults(result) {
             <h4><i class="fas fa-book"></i> Sources (${result.sources.length})</h4>
             ${result.sources.map((source, index) => `
                 <div class="source-item">
-                    <div class="source-title">${source.title || 'Unknown Document'}</div>
+                    <div class="source-title">${source.metadata?.document_title || source.title || 'Unknown Document'}</div>
                     <div class="source-meta">
-                        <span>Type: ${source.document_type}</span>
-                        <span>Chunk: ${source.chunk_index}</span>
+                        <span>Type: ${source.metadata?.document_title?.split('.').pop() || source.document_type || 'unknown'}</span>
+                        <span>Chunk: ${source.metadata?.chunk_index ?? source.chunk_index ?? 'N/A'}</span>
                         <span class="relevance-score">
                             Relevance: ${(result.relevance_scores[index] * 100).toFixed(1)}%
                         </span>
@@ -347,24 +364,34 @@ async function loadDashboardData() {
     try {
         showLoading(true);
         
-        // Load stats and documents in parallel
+        // Load stats and documents in parallel with cache-busting
+        const timestamp = Date.now();
         const [statsResponse, documentsResponse] = await Promise.all([
-            fetch('/stats'),
-            fetch('/documents')
+            fetch(`/stats?t=${timestamp}`, { cache: 'no-cache' }),
+            fetch(`/documents?t=${timestamp}`, { cache: 'no-cache' })
         ]);
         
         if (statsResponse.ok) {
             const stats = await statsResponse.json();
+            console.log('📊 Stats API response:', stats);
             updateDashboardStats(stats);
+        } else {
+            console.error('❌ Stats API failed:', statsResponse.status, statsResponse.statusText);
+            showToast('error', 'Failed to load dashboard statistics');
         }
         
         if (documentsResponse.ok) {
             const documents = await documentsResponse.json();
+            console.log('📚 Documents API response:', documents);
             updateDocumentsList(documents);
+        } else {
+            console.error('❌ Documents API failed:', documentsResponse.status, documentsResponse.statusText);
+            showToast('error', 'Failed to load documents list');
         }
         
     } catch (error) {
-        showToast('error', 'Failed to load dashboard data');
+        console.error('❌ Dashboard loading error:', error);
+        showToast('error', `Failed to load dashboard data: ${error.message}`);
     } finally {
         showLoading(false);
     }
@@ -375,7 +402,10 @@ function updateDashboardStats(stats) {
     elements.llmModel.textContent = stats.llm_model || 'N/A';
     elements.embeddingModel.textContent = stats.embedding_model || 'N/A';
     elements.pipelineStatus.textContent = stats.pipeline_status || 'Unknown';
-    elements.dbStatus.textContent = stats.vector_store_stats ? 'Connected' : 'Disconnected';
+    
+    // Update status to reflect Feast + Milvus-lite architecture
+    const isConnected = stats.vector_store_stats && stats.pipeline_status === 'ready';
+    elements.dbStatus.textContent = isConnected ? 'Feast + Milvus-lite Connected' : 'Disconnected';
 }
 
 function updateDocumentsList(documents) {
@@ -387,11 +417,11 @@ function updateDocumentsList(documents) {
     elements.documentsContainer.innerHTML = documents.documents.map(doc => `
         <div class="document-item">
             <div class="document-info">
-                <div class="document-name">${doc.title || 'Unknown Document'}</div>
+                <div class="document-name">📄 ${doc.title || 'Unknown Document'}</div>
                 <div class="document-meta">
-                    Type: ${doc.document_type} • 
-                    Chunks: ${doc.chunk_count || 'N/A'} • 
-                    Added: ${doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Unknown'}
+                    <span class="meta-badge">Type: ${doc.document_type}</span> • 
+                    <span class="meta-badge chunks">📊 ${doc.chunk_count || 'N/A'} chunks</span> • 
+                    <span class="meta-badge">📅 ${doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Unknown'}</span>
                 </div>
             </div>
         </div>
@@ -412,6 +442,7 @@ async function handleClearDocuments() {
         });
         
         if (response.ok) {
+            const result = await response.json();
             showToast('success', 'All documents cleared successfully');
             await loadDashboardData();
         } else {

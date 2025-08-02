@@ -533,6 +533,27 @@ body {
 .document-meta {
     font-size: 0.8rem;
     color: #6b7280;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.meta-badge {
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+    white-space: nowrap;
+}
+
+.meta-badge.chunks {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1e40af;
 }
 
 /* Toast notifications */

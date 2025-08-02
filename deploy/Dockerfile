@@ -13,9 +13,14 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
-ENV API_HOST=0.0.0.0
-ENV API_PORT=8000
-ENV OLLAMA_BASE_URL=http://ollama:11434
+
+# Feast RAG Pipeline configuration
+ENV RAG_API_HOST=0.0.0.0
+ENV RAG_API_PORT=8000
+ENV RAG_OLLAMA_HOST=ollama
+ENV RAG_OLLAMA_PORT=11434
+ENV RAG_FEAST_REPO_PATH=/app/feast_feature_repo
+ENV RAG_DEBUG_MODE=false
 
 # Copy requirements first for better caching
 COPY requirements.txt ./
@@ -31,15 +36,16 @@ RUN python -c "import uvicorn; print('uvicorn OK')"
 COPY src/ ./src/
 COPY config/ ./config/
 COPY static/ ./static/
+COPY feast_feature_repo/ ./feast_feature_repo/
 
 # Test app import before switching users
 RUN python -c "from src.api import app; print('App import OK')"
 
 # Create directories and set proper permissions
-RUN mkdir -p chroma_db logs
+RUN mkdir -p feast_feature_repo/data logs
 RUN chown -R app:app /app
-RUN chmod -R 755 /app/src /app/config /app/static
-RUN chmod 755 /app/chroma_db /app/logs
+RUN chmod -R 755 /app/src /app/config /app/static /app/feast_feature_repo
+RUN chmod 755 /app/logs
 
 # Switch to non-root user
 USER app

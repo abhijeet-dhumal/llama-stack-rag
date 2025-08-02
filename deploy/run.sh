@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# RAG Project Podman Runner
+# Feast RAG Pipeline Podman Runner
 # This script runs the Podman compose setup from the deploy directory
 
-echo "🚀 Starting RAG Project..."
+echo "🚀 Starting Feast RAG Pipeline..."
 
 # Check if Podman is available
 if ! command -v podman &> /dev/null; then
@@ -34,7 +34,7 @@ $COMPOSE_CMD up --build -d
 echo "📋 Running containers:"
 $COMPOSE_CMD ps
 
-echo "✅ RAG Project is running!"
+echo "✅ Feast RAG Pipeline is running!"
 echo "📖 API: http://localhost:8000"
 echo "🎯 UI: http://localhost:8000"
 echo "🔍 To view logs: $COMPOSE_CMD logs -f"
